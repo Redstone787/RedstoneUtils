@@ -4,20 +4,24 @@ RedstoneUtils is a client-side Fabric mod for Minecraft 26.2. It provides tools 
 
 The mod is intended for test worlds, creative builds, and rapid iteration. Several features generate or send Minecraft commands such as `/give`, `/setblock`, or `/tp`; on multiplayer servers, the required permissions must be available.
 
+## Download
+
+Download the latest release from the [GitHub Releases page](https://github.com/Redstone787/RedstoneUtils/releases).
+
 ## Project Status
 
 | Field | Value |
 | --- | --- |
 | Mod ID | `redstoneutils` |
 | Mod Name | `RedstoneUtils` |
-| Version | `1.0-SNAPSHOT` |
+| Version | `1.0.0` |
 | Minecraft | `26.2` |
 | Fabric Loader | `>=0.19.3` |
 | Fabric API | `0.154.2+26.2` |
 | Java | `25` |
 | Environment | Client |
 | License | All rights reserved |
-| Repository | <https://github.com/johannes/RedstoneUtils> |
+| Repository | <https://github.com/Redstone787/RedstoneUtils> |
 
 ## Features
 
