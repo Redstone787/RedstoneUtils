@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "redstoneutils",
+  "version": "${version}",
+  "name": "RedstoneUtils",
+  "description": "",
+  "authors": [],
+  "contact": {
+    "repo": "https://github.com/johannes/RedstoneUtils"
+  },
+  "license": "All-Rights-Reserved",
+  "icon": "assets/redstoneutils/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "org.main.redstoneutils.client.RedstoneUtilsClient"
+    ],
+    "main": [
+      "org.main.redstoneutils.RedstoneUtils"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric-api": "*",
+    "minecraft": "${minecraft_version}"
+  }
+}
