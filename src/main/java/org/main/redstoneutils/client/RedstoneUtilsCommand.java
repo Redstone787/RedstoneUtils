@@ -24,37 +24,41 @@ public class RedstoneUtilsCommand {
     private static final String ARG_RANGE = "range";
 
     public static void init() {
-        ClientCommandRegistrationCallback.EVENT.register(
-                (dispatcher, buildContext) -> dispatcher.register(ClientCommands.literal("redstone_utils")
-                        .then(ClientCommands.literal("wire_overlay")
-                                .executes(context -> setWireOverlay(context, !RedstoneUtilsClientActions.wireOverlayVisible()))
-                                .then(ClientCommands.argument(ARG_VISIBLE, BoolArgumentType.bool())
-                                        .executes(context -> setWireOverlay(context, BoolArgumentType.getBool(context, ARG_VISIBLE)))))
-                        .then(ClientCommands.literal("sculk_overlay")
-                                .executes(context -> setSculkOverlay(context, !RedstoneUtilsClientActions.sculkOverlayVisible()))
-                                .then(ClientCommands.argument(ARG_VISIBLE, BoolArgumentType.bool())
-                                        .executes(context -> setSculkOverlay(context, BoolArgumentType.getBool(context, ARG_VISIBLE)))))
-                        .then(ClientCommands.literal("all_overlays")
-                                .executes(context -> setAllOverlays(context, !allOverlaysVisible()))
-                                .then(ClientCommands.argument(ARG_VISIBLE, BoolArgumentType.bool())
-                                        .executes(context -> setAllOverlays(context, BoolArgumentType.getBool(context, ARG_VISIBLE)))))
-                        .then(ClientCommands.literal("config")
-                                .executes(RedstoneUtilsCommand::openConfig))
-                        .then(ClientCommands.literal("macros")
-                                .executes(RedstoneUtilsCommand::openMacros))
-                        .then(ClientCommands.literal("autowire")
-                                .executes(RedstoneUtilsCommand::showAutoWire)
-                                .then(ClientCommands.argument(ARG_MODE, StringArgumentType.word())
-                                        .suggests(RedstoneUtilsCommand::suggestWireTypes)
-                                        .executes(RedstoneUtilsCommand::setAutoWire)))
-                        .then(ClientCommands.literal("reset_autowire")
-                                .executes(RedstoneUtilsCommand::resetAutoWire))
-                        .then(ClientCommands.literal("tp")
-                                .executes(RedstoneUtilsCommand::teleport)
-                                .then(ClientCommands.argument(ARG_RANGE, DoubleArgumentType.doubleArg(10.0D, 1000.0D))
-                                        .executes(RedstoneUtilsCommand::teleportRange)))
-                )
-        );
+        ClientCommandRegistrationCallback.EVENT.register((dispatcher, buildContext) -> {
+            dispatcher.register(ClientCommands.literal("overlay")
+                    .executes(context -> setAllOverlays(context, !allOverlaysVisible()))
+                    .then(ClientCommands.literal("wire")
+                            .executes(context -> setWireOverlay(context, !RedstoneUtilsClientActions.wireOverlayVisible()))
+                            .then(ClientCommands.argument(ARG_VISIBLE, BoolArgumentType.bool())
+                                    .executes(context -> setWireOverlay(context, BoolArgumentType.getBool(context, ARG_VISIBLE)))))
+                    .then(ClientCommands.literal("sculk")
+                            .executes(context -> setSculkOverlay(context, !RedstoneUtilsClientActions.sculkOverlayVisible()))
+                            .then(ClientCommands.argument(ARG_VISIBLE, BoolArgumentType.bool())
+                                    .executes(context -> setSculkOverlay(context, BoolArgumentType.getBool(context, ARG_VISIBLE)))))
+                    .then(ClientCommands.literal("all")
+                            .executes(context -> setAllOverlays(context, !allOverlaysVisible()))
+                            .then(ClientCommands.argument(ARG_VISIBLE, BoolArgumentType.bool())
+                                    .executes(context -> setAllOverlays(context, BoolArgumentType.getBool(context, ARG_VISIBLE)))))
+            );
+
+            dispatcher.register(ClientCommands.literal("redstone_utils")
+                    .then(ClientCommands.literal("config")
+                            .executes(RedstoneUtilsCommand::openConfig))
+                    .then(ClientCommands.literal("macros")
+                            .executes(RedstoneUtilsCommand::openMacros))
+                    .then(ClientCommands.literal("autowire")
+                            .executes(RedstoneUtilsCommand::showAutoWire)
+                            .then(ClientCommands.argument(ARG_MODE, StringArgumentType.word())
+                                    .suggests(RedstoneUtilsCommand::suggestWireTypes)
+                                    .executes(RedstoneUtilsCommand::setAutoWire)))
+                    .then(ClientCommands.literal("reset_autowire")
+                            .executes(RedstoneUtilsCommand::resetAutoWire))
+                    .then(ClientCommands.literal("tp")
+                            .executes(RedstoneUtilsCommand::teleport)
+                            .then(ClientCommands.argument(ARG_RANGE, DoubleArgumentType.doubleArg(10.0D, 1000.0D))
+                                    .executes(RedstoneUtilsCommand::teleportRange)))
+            );
+        });
     }
 
     private static int setWireOverlay(CommandContext<FabricClientCommandSource> context, boolean visible) {

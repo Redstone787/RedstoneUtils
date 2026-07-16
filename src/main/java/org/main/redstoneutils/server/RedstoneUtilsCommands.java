@@ -54,8 +54,9 @@ public final class RedstoneUtilsCommands {
 
     public static void init() {
         CommandRegistrationCallback.EVENT.register((dispatcher, buildContext, environment) -> {
-            dispatcher.register(Commands.literal("redstone_utils")
-                    .then(Commands.literal("wire_overlay")
+            dispatcher.register(Commands.literal("overlay")
+                    .executes(context -> sendClientAction(context.getSource(), CLIENT_ALL_OVERLAYS, -1))
+                    .then(Commands.literal("wire")
                             .executes(context -> sendClientAction(context.getSource(), CLIENT_WIRE_OVERLAY, -1))
                             .then(Commands.argument(ARG_VISIBLE, BoolArgumentType.bool())
                                     .executes(context -> sendClientAction(
@@ -63,7 +64,7 @@ public final class RedstoneUtilsCommands {
                                             CLIENT_WIRE_OVERLAY,
                                             booleanValue(context, ARG_VISIBLE)
                                     ))))
-                    .then(Commands.literal("sculk_overlay")
+                    .then(Commands.literal("sculk")
                             .executes(context -> sendClientAction(context.getSource(), CLIENT_SCULK_OVERLAY, -1))
                             .then(Commands.argument(ARG_VISIBLE, BoolArgumentType.bool())
                                     .executes(context -> sendClientAction(
@@ -71,7 +72,7 @@ public final class RedstoneUtilsCommands {
                                             CLIENT_SCULK_OVERLAY,
                                             booleanValue(context, ARG_VISIBLE)
                                     ))))
-                    .then(Commands.literal("all_overlays")
+                    .then(Commands.literal("all")
                             .executes(context -> sendClientAction(context.getSource(), CLIENT_ALL_OVERLAYS, -1))
                             .then(Commands.argument(ARG_VISIBLE, BoolArgumentType.bool())
                                     .executes(context -> sendClientAction(
@@ -79,6 +80,9 @@ public final class RedstoneUtilsCommands {
                                             CLIENT_ALL_OVERLAYS,
                                             booleanValue(context, ARG_VISIBLE)
                                     ))))
+            );
+
+            dispatcher.register(Commands.literal("redstone_utils")
                     .then(Commands.literal("config")
                             .executes(context -> sendClientAction(context.getSource(), CLIENT_CONFIG, -1)))
                     .then(Commands.literal("macros")
