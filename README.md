@@ -2,13 +2,15 @@
 
 Redstone Utils is a Fabric mod for Minecraft 26.2 with client-side workflow tools and server-side implementations for world-editing features. Install it on both client and server for the complete multiplayer experience; client-only usage still provides the local overlays, menus, macros, calculator, and fallback commands where Minecraft allows them.
 
+[Releases / Downloads](https://github.com/Redstone787/RedstoneUtils/releases)
+
 ## Project Status
 
 | Field | Value |
 | --- | --- |
 | Mod ID | `redstoneutils` |
 | Display Name | Redstone Utils |
-| Version | `1.0.0` |
+| Version | `1.1.0` |
 | Minecraft | `26.2` |
 | Fabric Loader | `>=0.19.3` |
 | Fabric API | `0.154.2+26.2` |
