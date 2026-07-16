@@ -17,6 +17,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.resources.Identifier;
 import org.main.redstoneutils.client.config.RedstoneUtilsConfig;
+import org.main.redstoneutils.client.RedstoneUtilsClientNetworking;
 import org.main.redstoneutils.client.ui.RedstoneMessages;
 
 import java.util.*;
@@ -48,6 +49,7 @@ public class AutoWireHandler {
         activeWireType = wireType == null ? WireType.NONE : wireType;
         RedstoneUtilsConfig.setActiveWireType(activeWireType);
         AutoWire.reset();
+        RedstoneUtilsClientNetworking.setServerAutoWire(activeWireType);
         RedstoneMessages.popup("Active Wire: " + activeWireType.getDisplayName());
     }
 
@@ -93,6 +95,7 @@ public class AutoWireHandler {
     private static InteractionResult onUseBlock(Player player, Level level, InteractionHand hand, BlockHitResult hitResult) {
         WireType wireType = activeWireType;
         if (wireType == WireType.NONE || !level.isClientSide()) return InteractionResult.PASS;
+        if (RedstoneUtilsClientNetworking.hasServerBackend()) return InteractionResult.PASS;
         if (AutoWirePlacement.isManagedPlacementInProgress()) {
             return InteractionResult.PASS;
         }

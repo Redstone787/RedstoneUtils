@@ -549,9 +549,9 @@ public final class ConfigScreen extends Screen {
         return List.of(
                 help("Open Config", "/redstone_utils config", "Opens this screen. Use the Settings tab for global mod options and the Help tab for this overview."),
                 help("Macros", "/redstone_utils macros", "Opens the macro editor. It can bind commands to keys or shorten commands into custom aliases."),
-                help("Wire Preview Overlay", "/redstone_utils wire_overlay [true|false]", "Toggles the translucent AutoWire preview. With true or false, the state is set directly."),
-                help("Sculk Overlay", "/redstone_utils sculk_overlay [true|false]", "Shows or hides calculated sculk sensor ranges. Search distance and update rate are configured in Settings."),
-                help("All Overlays", "/redstone_utils all_overlays [true|false]", "Toggles the HUD layer, wire preview, and sculk overlay together. Useful when you quickly need a clear view."),
+                help("Wire Preview Overlay", "/overlay wire [true|false]", "Toggles the translucent AutoWire preview. With true or false, the state is set directly."),
+                help("Sculk Overlay", "/overlay sculk [true|false]", "Shows or hides calculated sculk sensor ranges. Search distance and update rate are configured in Settings."),
+                help("All Overlays", "/overlay all [true|false]", "Toggles the HUD layer, wire preview, and sculk overlay together. /overlay without a subcommand also toggles all overlays."),
                 help("Calculator", "/calc", "Opens the ingame calculator. It supports basic operators, parentheses, percent, powers, sqrt, and ans for the last result."),
                 help("Signal Barrel", "/signal <0-15>", "Gives you a barrel that outputs the selected comparator signal strength."),
                 help("Optimal Signal Block Item", "/signal <0-15> optimal", "Gives a compact block item for the selected comparator signal, such as a composter, cake, lectern, or respawn anchor."),

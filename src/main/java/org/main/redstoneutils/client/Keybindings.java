@@ -150,6 +150,7 @@ public final class Keybindings {
 
         @Override
         public boolean keyPressed(KeyEvent event) {
+            setMovementKeyState(event, true);
             return true;
         }
 
@@ -157,9 +158,17 @@ public final class Keybindings {
         public boolean keyReleased(KeyEvent event) {
             if (wireMenuKey != null && wireMenuKey.matches(event)) {
                 closeWireMenuScreen();
+            } else {
+                setMovementKeyState(event, false);
             }
 
             return true;
+        }
+
+        @Override
+        protected void init() {
+            super.init();
+            restoreHeldMovementKeys();
         }
 
         @Override
@@ -206,6 +215,33 @@ public final class Keybindings {
             if (RedstoneOverlay.isSegmentWheelVisible()) {
                 finishWireMenuSelection();
             }
+        }
+
+        private void setMovementKeyState(KeyEvent event, boolean pressed) {
+            for (KeyMapping movementKey : movementKeys()) {
+                if (movementKey.matches(event)) {
+                    movementKey.setDown(pressed);
+                }
+            }
+        }
+
+        private void restoreHeldMovementKeys() {
+            for (KeyMapping movementKey : movementKeys()) {
+                InputConstants.Key boundKey = InputConstants.getKey(movementKey.saveString());
+                boolean pressed = !movementKey.isUnbound()
+                        && boundKey.getType() == InputConstants.Type.KEYSYM
+                        && InputConstants.isKeyDown(minecraft.getWindow(), boundKey.getValue());
+                movementKey.setDown(pressed);
+            }
+        }
+
+        private KeyMapping[] movementKeys() {
+            return new KeyMapping[]{
+                    minecraft.options.keyUp,
+                    minecraft.options.keyDown,
+                    minecraft.options.keyLeft,
+                    minecraft.options.keyRight
+            };
         }
     }
 }

@@ -9,6 +9,7 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import org.main.redstoneutils.client.config.RedstoneUtilsConfig;
+import org.main.redstoneutils.client.RedstoneUtilsClientNetworking;
 import org.main.redstoneutils.client.ui.RedstoneMessages;
 
 import java.util.Locale;
@@ -25,6 +26,10 @@ public final class TpUtil {
         if (player == null) return;
 
         double maxRange = RedstoneUtilsConfig.getTeleportMaxRange();
+        if (RedstoneUtilsClientNetworking.teleport(maxRange)) {
+            return;
+        }
+
         Vec3 eyePos = player.getEyePosition();
         Vec3 viewVec = player.getViewVector(1.0F);
         Vec3 endPos = eyePos.add(viewVec.scale(maxRange));
