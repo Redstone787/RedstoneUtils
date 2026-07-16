@@ -1,15 +1,13 @@
-# RedstoneUtils
+# Redstone Utils
 
-RedstoneUtils is a Fabric mod for Minecraft 26.2 that can run on both client and server. It contains the full client UI from RedstoneUtilsClient plus server-side implementations for the features that can edit the world.
-
-This project is the full mod for worlds and servers where RedstoneUtils can be installed server-side. The separate `RedstoneUtilsClient` project remains a client-only fallback for players on creative servers where they cannot upload server mods.
+Redstone Utils is a Fabric mod for Minecraft 26.2 with client-side workflow tools and server-side implementations for world-editing features. Install it on both client and server for the complete multiplayer experience; client-only usage still provides the local overlays, menus, macros, calculator, and fallback commands where Minecraft allows them.
 
 ## Project Status
 
 | Field | Value |
 | --- | --- |
 | Mod ID | `redstoneutils` |
-| Mod Name | `RedstoneUtils` |
+| Display Name | Redstone Utils |
 | Version | `1.0.0` |
 | Minecraft | `26.2` |
 | Fabric Loader | `>=0.19.3` |
@@ -18,11 +16,11 @@ This project is the full mod for worlds and servers where RedstoneUtils can be i
 | Environment | Client + Server |
 | License | All rights reserved |
 
-## Server-Side Features
-
-World-editing features are implemented with server APIs instead of internally sending vanilla `/give`, `/setblock`, or `/tp` commands.
+## Features
 
 ### AutoWire
+
+AutoWire can be controlled through commands or the radial wire menu. On servers with Redstone Utils installed, the selected mode is stored per player and block placements are handled directly on the server.
 
 ```mcfunction
 /redstone_utils autowire
@@ -36,7 +34,7 @@ World-editing features are implemented with server APIs instead of internally se
 /redstone_utils reset_autowire
 ```
 
-AutoWire state is stored per player on the server. The server detects block placements and places dust, repeaters, comparators, and elevated support blocks directly.
+Supported placement modes cover redstone dust, repeaters, comparators, elevated support blocks, and fast booster layouts.
 
 ### Comparator Signal Tools
 
@@ -49,7 +47,7 @@ AutoWire state is stored per player on the server. The server detects block plac
 /set-signal <0-15>
 ```
 
-`/signal` creates ItemStacks directly and inserts them into the player inventory. `/set-content` and `/set-signal` raycast from the player and fill the targeted container block entity directly.
+`/signal` gives comparator-output items directly when the server module is available. `/set-content` and `/set-signal` raycast from the player and edit the targeted container block entity directly.
 
 ### Teleport Debugging
 
@@ -60,36 +58,44 @@ AutoWire state is stored per player on the server. The server detects block plac
 
 The server raycasts from the player and teleports them to the hit location, or forward to the maximum range if no block is hit.
 
-## Client Features
+### Client Tools
 
-RedstoneUtils also includes the client experience from RedstoneUtilsClient:
-
-- Wire Preview Overlay
-- Sculk Sensor Overlay
+- Wire preview overlay
+- Sculk sensor overlay
 - Config screen
 - Macro manager, command aliases, and keybind macros
-- In-game calculator UI
+- In-game calculator through `/calc`
 - Teleport keybind
 - Radial AutoWire menu
-- Popup/HUD feedback
+- Popup, chat, and action-bar feedback options
 
-When connected to a server with RedstoneUtils installed, the radial AutoWire menu and teleport keybind use RedstoneUtils networking payloads and run through server-side code. If the server backend is unavailable, the copied client logic can still fall back to client-side behavior where applicable.
+Overlay visibility is controlled through its own command:
 
-## Permissions
+```mcfunction
+/overlay
+/overlay wire [true|false]
+/overlay sculk [true|false]
+/overlay all [true|false]
+```
 
-Server-side commands and network actions are available to gamemaster-level users or creative players. This keeps world-editing behavior scoped to creative/test workflows.
+`/overlay` without a subcommand toggles all overlays. The radial AutoWire menu keeps the configured forward, backward, left, and right movement keys active while it is open.
+
+## Client/Server Behavior
+
+When the client connects to a server with Redstone Utils installed, AutoWire mode changes and teleport actions use custom networking payloads and execute through server-side code. If the server backend is unavailable, client-side behavior is used where possible.
+
+Server-side commands and network actions are available to gamemaster-level users or creative players, keeping world-editing tools scoped to creative and test workflows.
 
 ## Installation
 
-For the full experience, install this mod on both the client and the server.
+For the full experience, install the mod on both the client and the server.
 
 1. Install Fabric Loader for Minecraft 26.2.
 2. Install Fabric API for Minecraft 26.2.
-3. Place `RedstoneUtils-1.0.0.jar` in the client `mods` folder.
-4. Place `RedstoneUtils-1.0.0.jar` in the server `mods` folder.
-5. Start the server and client.
-
-Use `RedstoneUtilsClient` instead when only the client can install mods.
+3. Build or download the matching mod JAR.
+4. Place the mod JAR in the client `mods` folder.
+5. Place the same mod JAR in the server `mods` folder.
+6. Start the server and client.
 
 ## Building
 
@@ -107,24 +113,20 @@ Common Gradle commands:
 ./gradlew clean
 ```
 
-After a successful build, the remapped mod JAR is typically located at:
-
-```text
-build/libs/RedstoneUtils-1.0.0.jar
-```
+After a successful build, the remapped mod JAR is written to `build/libs/`.
 
 ## Project Structure
 
 ```text
 src/main/java/org/main/redstoneutils/
-  RedstoneUtils.java                 Shared mod initializer and Mod ID
-  client/                            Client overlays, screens, keybinds, macros, calculator
-  network/                           Client-to-server payload definitions
+  Shared initializer and mod ID helpers
+  client/                            Client overlays, screens, keybinds, macros, calculator, fallback commands
+  network/                           Client-to-server and server-to-client payload definitions
   server/                            Server commands, networking handlers, world-editing logic
 
 src/main/resources/
   fabric.mod.json                    Fabric metadata
-  assets/redstoneutils/              Client icon, language, and overlay textures
+  assets/redstoneutils/              Client icon, language file, and overlay textures
 ```
 
 ## License
