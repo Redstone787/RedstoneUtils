@@ -5,6 +5,7 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.util.Mth;
 import org.main.redstoneutils.client.util.ClientThreads;
+import org.main.redstoneutils.client.config.RedstoneUtilsConfig;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -68,7 +69,6 @@ final class PopupOverlay {
 
     private static final class PopupMessage {
 
-        private static final long DISPLAY_TIME = 3000L;
         private static final long ENTER_TIME = 240L;
         private static final long EXIT_TIME = 180L;
 
@@ -96,6 +96,8 @@ final class PopupOverlay {
         private float exitStartX = Float.NaN;
         private float exitStartOpacity = Float.NaN;
         private int width;
+        private int screenWidth;
+        private int screenHeight;
 
         private PopupMessage(String message, long createdAt) {
             this.message = message == null ? "" : message.strip();
@@ -118,6 +120,8 @@ final class PopupOverlay {
         private void render(GuiGraphicsExtractor graphics, long now) {
             Font font = Minecraft.getInstance().font;
             updateWidth(graphics);
+            screenWidth = graphics.guiWidth();
+            screenHeight = graphics.guiHeight();
 
             if (shouldExit(now)) {
                 startExit(now);
@@ -127,7 +131,7 @@ final class PopupOverlay {
             if (opacity <= 0.01F) return;
 
             int x = Math.round(xAt(now));
-            int y = TARGET_Y;
+            int y = targetY();
             int textX = x + ACCENT_WIDTH + PADDING_X;
             int textY = y + (HEIGHT - font.lineHeight) / 2;
             int textWidth = width - ACCENT_WIDTH - PADDING_X * 2;
@@ -147,7 +151,7 @@ final class PopupOverlay {
         }
 
         private boolean shouldExit(long now) {
-            return exitStartedAt == -1L && now - createdAt >= ENTER_TIME + DISPLAY_TIME;
+            return exitStartedAt == -1L && now - createdAt >= ENTER_TIME + RedstoneUtilsConfig.getPopupDurationMillis();
         }
 
         private boolean isFinished(long now) {
@@ -169,7 +173,7 @@ final class PopupOverlay {
 
         private float enterXAt(long now) {
             float progress = progress(now, createdAt, ENTER_TIME);
-            return Mth.lerp(easeOutCubic(progress), hiddenX(), TARGET_X);
+            return Mth.lerp(easeOutCubic(progress), hiddenX(), targetX());
         }
 
         private float opacityAt(long now) {
@@ -190,7 +194,25 @@ final class PopupOverlay {
         }
 
         private float hiddenX() {
-            return -width - SCREEN_PADDING;
+            return rightAnchored() ? screenWidth + SCREEN_PADDING : -width - SCREEN_PADDING;
+        }
+
+        private int targetX() {
+            return rightAnchored() ? screenWidth - width - TARGET_X : TARGET_X;
+        }
+
+        private int targetY() {
+            return bottomAnchored() ? screenHeight - HEIGHT - TARGET_Y : TARGET_Y;
+        }
+
+        private boolean rightAnchored() {
+            return RedstoneUtilsConfig.getPopupAnchor() == RedstoneUtilsConfig.PopupAnchor.TOP_RIGHT
+                    || RedstoneUtilsConfig.getPopupAnchor() == RedstoneUtilsConfig.PopupAnchor.BOTTOM_RIGHT;
+        }
+
+        private boolean bottomAnchored() {
+            return RedstoneUtilsConfig.getPopupAnchor() == RedstoneUtilsConfig.PopupAnchor.BOTTOM_LEFT
+                    || RedstoneUtilsConfig.getPopupAnchor() == RedstoneUtilsConfig.PopupAnchor.BOTTOM_RIGHT;
         }
 
         private String fitMessage(Font font, int maxWidth) {

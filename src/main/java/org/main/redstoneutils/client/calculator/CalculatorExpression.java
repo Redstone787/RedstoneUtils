@@ -1,5 +1,6 @@
 package org.main.redstoneutils.client.calculator;
 
+import net.minecraft.network.chat.Component;
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
@@ -15,14 +16,14 @@ final class CalculatorExpression {
         double value = parser.parseExpression();
         parser.skipWhitespace();
 
-        if (parser.hasRemaining()) throw parser.error("Unexpected input");
-        if (!Double.isFinite(value)) throw parser.error("Result is not finite");
+        if (parser.hasRemaining()) throw parser.error(message("unexpected"));
+        if (!Double.isFinite(value)) throw parser.error(message("not_finite"));
 
         return value;
     }
 
     static String formatNumber(double value) {
-        if (!Double.isFinite(value)) throw new IllegalArgumentException("Result is not finite");
+        if (!Double.isFinite(value)) throw new IllegalArgumentException(message("not_finite"));
         if (Math.abs(value) < 1.0E-12D) value = 0.0D;
 
         if (Math.abs(value) < 1.0E15D && value == Math.rint(value)) {
@@ -71,11 +72,11 @@ final class CalculatorExpression {
                     value *= parseUnary();
                 } else if (match('/')) {
                     double divisor = parseUnary();
-                    if (divisor == 0.0D) throw error("Division by zero");
+                    if (divisor == 0.0D) throw error(message("division_zero"));
                     value /= divisor;
                 } else if (match('%')) {
                     double divisor = parseUnary();
-                    if (divisor == 0.0D) throw error("Division by zero");
+                    if (divisor == 0.0D) throw error(message("division_zero"));
                     value %= divisor;
                 } else {
                     return value;
@@ -120,7 +121,7 @@ final class CalculatorExpression {
                 return parseWord();
             }
 
-            throw error("Expected number");
+            throw error(message("expected_number"));
         }
 
         private double parseNumber() {
@@ -139,7 +140,7 @@ final class CalculatorExpression {
                 }
             }
 
-            if (start == index || ".".equals(input.substring(start, index))) throw error("Expected number");
+            if (start == index || ".".equals(input.substring(start, index))) throw error(message("expected_number"));
             return Double.parseDouble(input.substring(start, index));
         }
 
@@ -153,7 +154,7 @@ final class CalculatorExpression {
             return switch (word) {
                 case "ans" -> lastAnswer;
                 case "sqrt" -> parseSqrt();
-                default -> throw error("Unknown function");
+                default -> throw error(message("unknown_function"));
             };
         }
 
@@ -168,7 +169,7 @@ final class CalculatorExpression {
                 value = parseUnary();
             }
 
-            if (value < 0.0D) throw error("Square root of negative number");
+            if (value < 0.0D) throw error(message("negative_sqrt"));
             return Math.sqrt(value);
         }
 
@@ -181,7 +182,7 @@ final class CalculatorExpression {
         }
 
         private void expect(char expected) {
-            if (!match(expected)) throw error("Expected " + expected);
+            if (!match(expected)) throw error(Component.translatable("calculator.redstoneutils.error.expected", expected).getString());
         }
 
         private boolean match(char expected) {
@@ -203,7 +204,11 @@ final class CalculatorExpression {
         }
 
         private IllegalArgumentException error(String message) {
-            return new IllegalArgumentException(message + " at " + index);
+            return new IllegalArgumentException(Component.translatable("calculator.redstoneutils.error.position", message, index).getString());
         }
+    }
+
+    private static String message(String suffix) {
+        return Component.translatable("calculator.redstoneutils.error." + suffix).getString();
     }
 }

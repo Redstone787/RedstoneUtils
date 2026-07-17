@@ -85,7 +85,7 @@ public final class SignalUtil {
 
         String command = "give @s " + SignalBarrelItem.create(strength);
         source.getPlayer().connection.sendCommand(command);
-        source.sendFeedback(Component.literal("Sent signal barrel give command for strength " + strength));
+        source.sendFeedback(Component.translatable("message.redstoneutils.signal.sent_barrel", strength));
 
         return 1;
     }
@@ -95,7 +95,7 @@ public final class SignalUtil {
 
         String command = "give @s " + SignalBlockItem.createOptimal(strength);
         source.getPlayer().connection.sendCommand(command);
-        source.sendFeedback(Component.literal("Sent optimal signal block give command for strength " + strength));
+        source.sendFeedback(Component.translatable("message.redstoneutils.signal.sent_optimal", strength));
 
         return 1;
     }
@@ -103,7 +103,7 @@ public final class SignalUtil {
     private static int createSignalBlock(FabricClientCommandSource source, int strength, String blockName) {
         SignalBlockVariant variant = SignalBlockVariant.find(blockName).orElse(null);
         if (variant == null) {
-            source.sendFeedback(Component.literal("Unknown signal block. Supported: " + SignalBlockVariant.suggestions()));
+            source.sendFeedback(Component.translatable("message.redstoneutils.signal.unknown", SignalBlockVariant.suggestions()));
             return 0;
         }
         if (!variant.supports(strength)) {
@@ -118,7 +118,7 @@ public final class SignalUtil {
 
         String command = "give @s " + argument;
         source.getPlayer().connection.sendCommand(command);
-        source.sendFeedback(Component.literal("Sent " + variant.displayName() + " give command for strength " + strength));
+        source.sendFeedback(Component.translatable("message.redstoneutils.signal.sent_give", variant.displayName(), strength));
         return 1;
     }
 
@@ -134,13 +134,13 @@ public final class SignalUtil {
                 + " replace";
 
         target.player().connection.sendCommand(command);
-        target.source().sendFeedback(Component.literal("Sent " + variant.displayName() + " setblock command for strength " + strength));
+        target.source().sendFeedback(Component.translatable("message.redstoneutils.signal.sent_setblock", variant.displayName(), strength));
         return 1;
     }
 
     private static int showSignalBlockOptions(FabricClientCommandSource source) {
-        source.sendFeedback(Component.literal("Usage: /signal <strength> block <type>"));
-        source.sendFeedback(Component.literal("Supported: " + SignalBlockVariant.suggestions()));
+        source.sendFeedback(Component.translatable("message.redstoneutils.signal.usage"));
+        source.sendFeedback(Component.translatable("message.redstoneutils.signal.supported", SignalBlockVariant.suggestions()));
         return 1;
     }
 
@@ -152,7 +152,7 @@ public final class SignalUtil {
     }
 
     private static int setContent(FabricClientCommandSource source, int amount) {
-        return setContainerContent(source, amount, "Sent setblock content command for " + amount + " items");
+        return setContainerContent(source, amount, Component.translatable("message.redstoneutils.signal.sent_content", amount));
     }
 
     private static int setSignal(FabricClientCommandSource source, int strength) {
@@ -161,17 +161,17 @@ public final class SignalUtil {
 
         int slotMaxStackSize = ContainerBlockArgument.slotMaxStackSize(target.container(), target.heldStack());
         int amount = ComparatorSignal.amountForSignal(strength, target.container().getContainerSize(), slotMaxStackSize);
-        return setContainerContent(target, amount, "Sent setblock signal command for strength " + strength + " (" + amount + " items)");
+        return setContainerContent(target, amount, Component.translatable("message.redstoneutils.signal.sent_signal", strength, amount));
     }
 
-    private static int setContainerContent(FabricClientCommandSource source, int amount, String feedback) {
+    private static int setContainerContent(FabricClientCommandSource source, int amount, Component feedback) {
         TargetedContainer target = TargetedContainer.resolve(source, amount > 0).orElse(null);
         if (target == null) return 0;
 
         return setContainerContent(target, amount, feedback);
     }
 
-    private static int setContainerContent(TargetedContainer target, int amount, String feedback) {
+    private static int setContainerContent(TargetedContainer target, int amount, Component feedback) {
         String blockArgument = ContainerBlockArgument.create(
                 target.client(),
                 target.blockState(),
@@ -187,7 +187,7 @@ public final class SignalUtil {
                 + " replace";
 
         target.player().connection.sendCommand(command);
-        target.source().sendFeedback(Component.literal(feedback));
+        target.source().sendFeedback(feedback);
         return 1;
     }
 }

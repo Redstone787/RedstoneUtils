@@ -83,7 +83,7 @@ final class CalculatorScreen extends Screen {
     private boolean justEvaluated;
 
     CalculatorScreen() {
-        super(Component.literal("Calculator"));
+        super(Component.translatable("screen.redstoneutils.calculator"));
     }
 
     @Override
@@ -182,7 +182,7 @@ final class CalculatorScreen extends Screen {
         graphics.fill(layout.x(), layout.y(), layout.x() + layout.width(), layout.y() + layout.height(), PANEL_COLOR);
         graphics.fill(layout.x(), layout.y(), layout.x() + layout.width(), layout.y() + 1, PANEL_HIGHLIGHT_COLOR);
         graphics.outline(layout.x(), layout.y(), layout.width(), layout.height(), PANEL_BORDER_COLOR);
-        graphics.text(font, "Calculator", layout.x() + layout.padding(), layout.y() + 7, TEXT_COLOR, false);
+        graphics.text(font, Component.translatable("screen.redstoneutils.calculator"), layout.x() + layout.padding(), layout.y() + 7, TEXT_COLOR, false);
     }
 
     private void drawDisplay(GuiGraphicsExtractor graphics, CalculatorLayout layout) {
@@ -305,7 +305,7 @@ final class CalculatorScreen extends Screen {
             error = "";
             justEvaluated = true;
         } catch (IllegalArgumentException exception) {
-            error = "Invalid expression";
+            error = Component.translatable("calculator.redstoneutils.error.invalid").getString();
             justEvaluated = false;
         }
     }

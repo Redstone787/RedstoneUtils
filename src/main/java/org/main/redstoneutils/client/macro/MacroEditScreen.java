@@ -7,6 +7,7 @@ import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
@@ -22,7 +23,7 @@ final class MacroEditScreen extends Screen {
     private static final int PANEL_MIN_WIDTH = 430;
     private static final int PANEL_MAX_WIDTH = 580;
     private static final int PANEL_MIN_HEIGHT = 310;
-    private static final int PANEL_MAX_HEIGHT = 360;
+    private static final int PANEL_MAX_HEIGHT = 430;
     private static final int FIELD_HEIGHT = 20;
     private static final int BUTTON_HEIGHT = 24;
     private static final int TYPE_BUTTON_WIDTH = 126;
@@ -34,6 +35,11 @@ final class MacroEditScreen extends Screen {
 
     private MacroType type;
     private int keyCode;
+    private boolean mouseButton;
+    private int modifiers;
+    private Macro.MacroTrigger trigger;
+    private boolean enabled;
+    private String categoryValue;
     private String nameValue;
     private String commandValue;
     private String aliasValue;
@@ -43,14 +49,20 @@ final class MacroEditScreen extends Screen {
     private EditBox nameBox;
     private EditBox commandBox;
     private EditBox aliasBox;
+    private EditBox categoryBox;
 
     private MacroEditScreen(Screen parent, Macro macro, MacroType fallbackType) {
-        super(Component.literal("RedstoneUtils Macro"));
+        super(Component.translatable("screen.redstoneutils.macro_edit"));
         this.parent = parent;
         this.editing = macro != null;
         this.originalId = macro == null ? null : macro.id();
         this.type = macro == null ? fallbackType : macro.type();
         this.keyCode = macro == null ? Macro.UNBOUND_KEY : macro.keyCode();
+        this.mouseButton = macro != null && macro.mouseButton();
+        this.modifiers = macro == null ? 0 : macro.modifiers();
+        this.trigger = macro == null ? Macro.MacroTrigger.PRESSED : macro.trigger();
+        this.enabled = macro == null || macro.enabled();
+        this.categoryValue = macro == null ? "General" : macro.category();
         this.nameValue = macro == null ? "" : macro.name();
         this.commandValue = macro == null ? "" : MacroCommandText.formatCommand(macro.command());
         this.aliasValue = macro == null ? "" : MacroCommandText.formatCommand(macro.alias());
@@ -72,9 +84,10 @@ final class MacroEditScreen extends Screen {
     protected void init() {
         captureFieldValues();
 
-        nameBox = addWidget(createBox("Name", nameValue, 80));
-        commandBox = addWidget(createBox("Command", commandValue, 512));
-        aliasBox = addWidget(createBox("New command", aliasValue, 64));
+        nameBox = addWidget(createBox(text("macro.redstoneutils.name"), nameValue, 80));
+        commandBox = addWidget(createBox(text("macro.redstoneutils.command"), commandValue, 512));
+        aliasBox = addWidget(createBox(text("macro.redstoneutils.alias"), aliasValue, 64));
+        categoryBox = addWidget(createBox(text("macro.redstoneutils.category"), categoryValue, 48));
         positionFields(layout(width, height));
     }
 
@@ -101,6 +114,16 @@ final class MacroEditScreen extends Screen {
         double mouseX = event.x();
         double mouseY = event.y();
 
+        if (capturingKey) {
+            keyCode = event.button();
+            mouseButton = true;
+            modifiers = event.modifiers() & MacroKeys.ALL_MODIFIERS;
+            capturingKey = false;
+            error = "";
+            playClick();
+            return true;
+        }
+
         if (event.button() != InputConstants.MOUSE_BUTTON_LEFT) return true;
 
         if (RedstoneUi.contains(mouseX, mouseY, layout.keybindTypeX(), layout.typeY(), TYPE_BUTTON_WIDTH, BUTTON_HEIGHT)) {
@@ -123,6 +146,18 @@ final class MacroEditScreen extends Screen {
             return true;
         }
 
+        if (type == MacroType.KEYBIND && RedstoneUi.contains(mouseX, mouseY, layout.fieldX(), layout.triggerY(), 160, BUTTON_HEIGHT)) {
+            trigger = Macro.MacroTrigger.values()[(trigger.ordinal() + 1) % Macro.MacroTrigger.values().length];
+            playClick();
+            return true;
+        }
+
+        if (RedstoneUi.contains(mouseX, mouseY, layout.fieldX() + 170, layout.triggerY(), 140, BUTTON_HEIGHT)) {
+            enabled = !enabled;
+            playClick();
+            return true;
+        }
+
         if (RedstoneUi.contains(mouseX, mouseY, layout.saveX(), layout.footerButtonY(), FOOTER_BUTTON_WIDTH, BUTTON_HEIGHT)) {
             saveAndClose();
             playClick();
@@ -136,8 +171,12 @@ final class MacroEditScreen extends Screen {
         }
 
         if (editing && RedstoneUi.contains(mouseX, mouseY, layout.deleteX(), layout.footerButtonY(), FOOTER_BUTTON_WIDTH, BUTTON_HEIGHT)) {
-            MacroStore.delete(originalId);
-            returnToList();
+            captureFieldValues();
+            Minecraft.getInstance().gui.setScreen(new ConfirmScreen(confirmed -> {
+                if (confirmed) MacroStore.delete(originalId);
+                Minecraft.getInstance().gui.setScreen(confirmed ? parent : this);
+            }, Component.translatable("macros.redstoneutils.delete_confirm.title"),
+                    Component.translatable("macros.redstoneutils.delete_confirm.message", nameValue)));
             playClick();
             return true;
         }
@@ -157,7 +196,7 @@ final class MacroEditScreen extends Screen {
         int key = event.key();
 
         if (capturingKey) {
-            captureKey(key);
+            captureKey(event);
             return true;
         }
 
@@ -198,11 +237,11 @@ final class MacroEditScreen extends Screen {
     }
 
     private void drawHeader(GuiGraphicsExtractor graphics, Layout layout) {
-        String title = editing ? "Edit Macro" : "New Macro";
+        String title = text(editing ? "macro.redstoneutils.edit_title" : "macro.redstoneutils.new_title");
         graphics.text(font, title, layout.x() + RedstoneUi.PANEL_PADDING, layout.y() + 8, RedstoneUi.TEXT_COLOR, false);
 
         String subtitle = error.isBlank()
-                ? "Commands may be entered with or without a leading slash."
+                ? text("macro.redstoneutils.subtitle")
                 : error;
         int subtitleColor = error.isBlank() ? RedstoneUi.MUTED_TEXT_COLOR : RedstoneUi.ERROR_TEXT_COLOR;
         RedstoneUi.drawFittedText(graphics, font, subtitle, layout.x() + RedstoneUi.PANEL_PADDING, layout.y() + 24, layout.width() - RedstoneUi.PANEL_PADDING * 2, subtitleColor);
@@ -212,28 +251,38 @@ final class MacroEditScreen extends Screen {
         boolean keybindHovered = RedstoneUi.contains(mouseX, mouseY, layout.keybindTypeX(), layout.typeY(), TYPE_BUTTON_WIDTH, BUTTON_HEIGHT);
         boolean commandHovered = RedstoneUi.contains(mouseX, mouseY, layout.commandTypeX(), layout.typeY(), TYPE_BUTTON_WIDTH, BUTTON_HEIGHT);
 
-        RedstoneUi.drawButton(graphics, font, "Keybind", layout.keybindTypeX(), layout.typeY(), TYPE_BUTTON_WIDTH, BUTTON_HEIGHT, keybindHovered, type == MacroType.KEYBIND ? RedstoneUi.ButtonTone.ACTIVE : RedstoneUi.ButtonTone.NORMAL);
-        RedstoneUi.drawButton(graphics, font, "Command", layout.commandTypeX(), layout.typeY(), TYPE_BUTTON_WIDTH, BUTTON_HEIGHT, commandHovered, type == MacroType.COMMAND ? RedstoneUi.ButtonTone.ACTIVE : RedstoneUi.ButtonTone.NORMAL);
+        RedstoneUi.drawButton(graphics, font, text("macro.redstoneutils.keybind"), layout.keybindTypeX(), layout.typeY(), TYPE_BUTTON_WIDTH, BUTTON_HEIGHT, keybindHovered, type == MacroType.KEYBIND ? RedstoneUi.ButtonTone.ACTIVE : RedstoneUi.ButtonTone.NORMAL);
+        RedstoneUi.drawButton(graphics, font, text("macro.redstoneutils.command_type"), layout.commandTypeX(), layout.typeY(), TYPE_BUTTON_WIDTH, BUTTON_HEIGHT, commandHovered, type == MacroType.COMMAND ? RedstoneUi.ButtonTone.ACTIVE : RedstoneUi.ButtonTone.NORMAL);
     }
 
     private void drawFields(GuiGraphicsExtractor graphics, Layout layout, int mouseX, int mouseY, float deltaTicks) {
-        drawLabel(graphics, "Name", layout.fieldX(), layout.nameLabelY());
+        drawLabel(graphics, text("macro.redstoneutils.name"), layout.fieldX(), layout.nameLabelY());
         nameBox.extractRenderState(graphics, mouseX, mouseY, deltaTicks);
 
-        drawLabel(graphics, "Command to run", layout.fieldX(), layout.commandLabelY());
+        drawLabel(graphics, text("macro.redstoneutils.command_to_run"), layout.fieldX(), layout.commandLabelY());
         commandBox.extractRenderState(graphics, mouseX, mouseY, deltaTicks);
 
         if (type == MacroType.COMMAND) {
-            drawLabel(graphics, "New command", layout.fieldX(), layout.bindingLabelY());
+            drawLabel(graphics, text("macro.redstoneutils.alias"), layout.fieldX(), layout.bindingLabelY());
             aliasBox.extractRenderState(graphics, mouseX, mouseY, deltaTicks);
-            graphics.text(font, "One command word, for example /wire.", layout.fieldX(), layout.bindingFieldY() + FIELD_HEIGHT + 7, RedstoneUi.MUTED_TEXT_COLOR, false);
+            graphics.text(font, Component.translatable("macro.redstoneutils.alias_hint"), layout.fieldX(), layout.bindingFieldY() + FIELD_HEIGHT + 7, RedstoneUi.MUTED_TEXT_COLOR, false);
         } else {
-            drawLabel(graphics, "Keybinding", layout.fieldX(), layout.bindingLabelY());
+            drawLabel(graphics, text("macro.redstoneutils.binding"), layout.fieldX(), layout.bindingLabelY());
             boolean hovered = RedstoneUi.contains(mouseX, mouseY, layout.fieldX(), layout.bindingFieldY(), layout.fieldWidth(), FIELD_HEIGHT);
-            String label = capturingKey ? "Press a key..." : MacroKeys.displayName(keyCode);
+            String label = capturingKey ? text("macro.redstoneutils.capture") : MacroKeys.displayName(keyCode, mouseButton, modifiers);
             RedstoneUi.drawButton(graphics, font, label, layout.fieldX(), layout.bindingFieldY(), layout.fieldWidth(), FIELD_HEIGHT, hovered, capturingKey ? RedstoneUi.ButtonTone.ACTIVE : RedstoneUi.ButtonTone.NORMAL);
-            graphics.text(font, "Escape, Backspace, or Delete clears the binding while capturing.", layout.fieldX(), layout.bindingFieldY() + FIELD_HEIGHT + 7, RedstoneUi.MUTED_TEXT_COLOR, false);
+            graphics.text(font, Component.translatable("macro.redstoneutils.capture_hint"), layout.fieldX(), layout.bindingFieldY() + FIELD_HEIGHT + 7, RedstoneUi.MUTED_TEXT_COLOR, false);
         }
+
+        drawLabel(graphics, text("macro.redstoneutils.category"), layout.fieldX(), layout.categoryLabelY());
+        categoryBox.extractRenderState(graphics, mouseX, mouseY, deltaTicks);
+        if (type == MacroType.KEYBIND) {
+            boolean triggerHovered = RedstoneUi.contains(mouseX, mouseY, layout.fieldX(), layout.triggerY(), 160, BUTTON_HEIGHT);
+            RedstoneUi.drawButton(graphics, font, Component.translatable("macro.redstoneutils.trigger", text("enum.redstoneutils." + trigger.name().toLowerCase(java.util.Locale.ROOT))).getString(), layout.fieldX(), layout.triggerY(), 160, BUTTON_HEIGHT, triggerHovered, RedstoneUi.ButtonTone.NORMAL);
+        }
+        boolean enabledHovered = RedstoneUi.contains(mouseX, mouseY, layout.fieldX() + 170, layout.triggerY(), 140, BUTTON_HEIGHT);
+        RedstoneUi.drawButton(graphics, font, text(enabled ? "state.redstoneutils.enabled" : "state.redstoneutils.disabled"), layout.fieldX() + 170, layout.triggerY(), 140, BUTTON_HEIGHT, enabledHovered,
+                enabled ? RedstoneUi.ButtonTone.ACTIVE : RedstoneUi.ButtonTone.NORMAL);
     }
 
     private void drawFooter(GuiGraphicsExtractor graphics, Layout layout, int mouseX, int mouseY) {
@@ -242,10 +291,10 @@ final class MacroEditScreen extends Screen {
         boolean deleteHovered = editing && RedstoneUi.contains(mouseX, mouseY, layout.deleteX(), layout.footerButtonY(), FOOTER_BUTTON_WIDTH, BUTTON_HEIGHT);
 
         if (editing) {
-            RedstoneUi.drawButton(graphics, font, "Delete", layout.deleteX(), layout.footerButtonY(), FOOTER_BUTTON_WIDTH, BUTTON_HEIGHT, deleteHovered, RedstoneUi.ButtonTone.DANGER);
+            RedstoneUi.drawButton(graphics, font, text("macros.redstoneutils.delete"), layout.deleteX(), layout.footerButtonY(), FOOTER_BUTTON_WIDTH, BUTTON_HEIGHT, deleteHovered, RedstoneUi.ButtonTone.DANGER);
         }
-        RedstoneUi.drawButton(graphics, font, "Cancel", layout.cancelX(), layout.footerButtonY(), FOOTER_BUTTON_WIDTH, BUTTON_HEIGHT, cancelHovered, RedstoneUi.ButtonTone.NORMAL);
-        RedstoneUi.drawButton(graphics, font, "Save", layout.saveX(), layout.footerButtonY(), FOOTER_BUTTON_WIDTH, BUTTON_HEIGHT, saveHovered, RedstoneUi.ButtonTone.ACTIVE);
+        RedstoneUi.drawButton(graphics, font, text("gui.cancel"), layout.cancelX(), layout.footerButtonY(), FOOTER_BUTTON_WIDTH, BUTTON_HEIGHT, cancelHovered, RedstoneUi.ButtonTone.NORMAL);
+        RedstoneUi.drawButton(graphics, font, text("gui.save"), layout.saveX(), layout.footerButtonY(), FOOTER_BUTTON_WIDTH, BUTTON_HEIGHT, saveHovered, RedstoneUi.ButtonTone.ACTIVE);
     }
 
     private void drawLabel(GuiGraphicsExtractor graphics, String label, int x, int y) {
@@ -261,9 +310,10 @@ final class MacroEditScreen extends Screen {
         }
 
         String id = originalId == null ? UUID.randomUUID().toString() : originalId;
-        Macro macro = type == MacroType.KEYBIND
-                ? Macro.keybind(id, nameValue, commandValue, keyCode)
-                : Macro.commandAlias(id, nameValue, commandValue, aliasValue);
+        Macro macro = new Macro(
+                id, type, nameValue, commandValue, keyCode, aliasValue,
+                mouseButton, modifiers, trigger, enabled, categoryValue
+        );
         MacroStore.upsert(macro);
         returnToList();
     }
@@ -273,19 +323,19 @@ final class MacroEditScreen extends Screen {
         commandValue = MacroCommandText.normalizeCommand(commandValue);
         aliasValue = MacroCommandText.normalizeAlias(aliasValue);
 
-        if (nameValue.isBlank()) return "Name is required.";
-        if (commandValue.isBlank()) return "Command to run is required.";
+        if (nameValue.isBlank()) return text("macro.redstoneutils.error.name");
+        if (commandValue.isBlank()) return text("macro.redstoneutils.error.command");
 
         if (type == MacroType.KEYBIND) {
-            if (!MacroKeys.isBound(keyCode)) return "Choose a keybinding.";
-            if (MacroStore.keyExists(keyCode, originalId)) return "This keybinding is already used by another macro.";
+            if (!MacroKeys.isBound(keyCode)) return text("macro.redstoneutils.error.binding");
+            if (MacroStore.bindingExists(keyCode, mouseButton, modifiers, originalId)) return text("macro.redstoneutils.error.binding_used");
             return "";
         }
 
-        if (!MacroCommandText.isValidAliasInput(aliasBox.getValue())) return "New command must be one word using a-z, 0-9, underscore, or hyphen.";
-        if (CommandCommand.isReservedAlias(aliasValue)) return "/" + aliasValue + " is reserved by RedstoneUtils.";
-        if (MacroCommandText.normalizeAlias(commandValue).equals(aliasValue)) return "A command macro cannot call itself.";
-        if (MacroStore.aliasExists(aliasValue, originalId)) return "This command macro already exists.";
+        if (!MacroCommandText.isValidAliasInput(aliasBox.getValue())) return text("macro.redstoneutils.error.alias");
+        if (CommandCommand.isReservedAlias(aliasValue)) return Component.translatable("macro.redstoneutils.error.reserved", "/" + aliasValue).getString();
+        if (MacroCommandText.normalizeAlias(commandValue).equals(aliasValue)) return text("macro.redstoneutils.error.self");
+        if (MacroStore.aliasExists(aliasValue, originalId)) return text("macro.redstoneutils.error.alias_used");
 
         return "";
     }
@@ -303,11 +353,16 @@ final class MacroEditScreen extends Screen {
         setFieldFocus(null);
     }
 
-    private void captureKey(int key) {
+    private void captureKey(KeyEvent event) {
+        int key = event.key();
         if (key == InputConstants.KEY_ESCAPE || key == InputConstants.KEY_BACKSPACE || key == InputConstants.KEY_DELETE) {
             keyCode = Macro.UNBOUND_KEY;
+            mouseButton = false;
+            modifiers = 0;
         } else {
             keyCode = key;
+            mouseButton = false;
+            modifiers = event.modifiers() & MacroKeys.ALL_MODIFIERS;
         }
 
         capturingKey = false;
@@ -338,12 +393,12 @@ final class MacroEditScreen extends Screen {
 
     private List<EditBox> visibleFields() {
         return type == MacroType.COMMAND
-                ? List.of(nameBox, commandBox, aliasBox)
-                : List.of(nameBox, commandBox);
+                ? List.of(nameBox, commandBox, aliasBox, categoryBox)
+                : List.of(nameBox, commandBox, categoryBox);
     }
 
     private List<EditBox> allFields() {
-        return List.of(nameBox, commandBox, aliasBox);
+        return List.of(nameBox, commandBox, aliasBox, categoryBox);
     }
 
     private EditBox createBox(String label, String value, int maxLength) {
@@ -360,12 +415,14 @@ final class MacroEditScreen extends Screen {
         if (nameBox != null) nameValue = nameBox.getValue();
         if (commandBox != null) commandValue = commandBox.getValue();
         if (aliasBox != null) aliasValue = aliasBox.getValue();
+        if (categoryBox != null) categoryValue = categoryBox.getValue();
     }
 
     private void positionFields(Layout layout) {
         positionField(nameBox, layout.fieldX(), layout.nameFieldY(), layout.fieldWidth());
         positionField(commandBox, layout.fieldX(), layout.commandFieldY(), layout.fieldWidth());
         positionField(aliasBox, layout.fieldX(), layout.bindingFieldY(), layout.fieldWidth());
+        positionField(categoryBox, layout.fieldX(), layout.categoryFieldY(), layout.fieldWidth());
         updateFieldVisibility();
     }
 
@@ -391,6 +448,10 @@ final class MacroEditScreen extends Screen {
             aliasBox.setVisible(aliasVisible);
             aliasBox.active = aliasVisible;
         }
+        if (categoryBox != null) {
+            categoryBox.visible = true;
+            categoryBox.active = true;
+        }
     }
 
     private static Layout layout(int screenWidth, int screenHeight) {
@@ -403,6 +464,10 @@ final class MacroEditScreen extends Screen {
 
     private static void playClick() {
         AbstractWidget.playButtonClickSound(Minecraft.getInstance().getSoundManager());
+    }
+
+    private static String text(String key) {
+        return Component.translatable(key).getString();
     }
 
     private record Layout(int x, int y, int width, int height) {
@@ -448,6 +513,18 @@ final class MacroEditScreen extends Screen {
 
         private int bindingFieldY() {
             return bindingLabelY() + 12;
+        }
+
+        private int categoryLabelY() {
+            return bindingFieldY() + FIELD_HEIGHT + 24;
+        }
+
+        private int categoryFieldY() {
+            return categoryLabelY() + 12;
+        }
+
+        private int triggerY() {
+            return categoryFieldY() + FIELD_HEIGHT + 14;
         }
 
         private int footerButtonY() {

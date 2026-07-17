@@ -4,6 +4,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 
 public class AutoWire {
@@ -292,6 +293,7 @@ public class AutoWire {
 
     private static boolean placeElevatedBlock(Level level, BlockPos placedBlockPos, BlockPos targetBlockPos, BlockState blockState, Item item) {
         if (blockState == null) {
+            AutoWirePlacement.reportFailure("missing_support", Blocks.AIR.defaultBlockState());
             return false;
         }
         if (!AutoWirePlacement.placeOnTop(level, placedBlockPos, blockState, item)) {

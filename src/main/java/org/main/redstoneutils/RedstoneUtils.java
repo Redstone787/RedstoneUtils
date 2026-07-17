@@ -6,9 +6,13 @@ import org.main.redstoneutils.network.RedstoneUtilsNetworking;
 import org.main.redstoneutils.server.RedstoneUtilsCommands;
 import org.main.redstoneutils.server.RedstoneUtilsServerNetworking;
 import org.main.redstoneutils.server.autowire.ServerAutoWire;
+import org.main.redstoneutils.server.config.RedstoneUtilsServerConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class RedstoneUtils implements ModInitializer {
     public static final String MOD_ID = "redstoneutils";
+    public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
     public static Identifier id(String path) {
         return Identifier.fromNamespaceAndPath(MOD_ID, path);
@@ -16,6 +20,7 @@ public class RedstoneUtils implements ModInitializer {
 
     @Override
     public void onInitialize() {
+        RedstoneUtilsServerConfig.load();
         RedstoneUtilsNetworking.init();
         ServerAutoWire.init();
         RedstoneUtilsCommands.init();

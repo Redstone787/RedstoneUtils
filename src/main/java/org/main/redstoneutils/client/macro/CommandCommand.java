@@ -1,6 +1,7 @@
 package org.main.redstoneutils.client.macro;
 
 import net.fabricmc.fabric.api.client.message.v1.ClientSendMessageEvents;
+import net.minecraft.network.chat.Component;
 import org.main.redstoneutils.client.ui.RedstoneMessages;
 
 import java.util.HashSet;
@@ -44,7 +45,7 @@ public final class CommandCommand {
             if (macro == null) return new Expansion(currentCommand, expanded, null);
 
             if (!visitedAliases.add(root)) {
-                return new Expansion(currentCommand, expanded, "Macro alias loop detected at /" + root);
+                return new Expansion(currentCommand, expanded, Component.translatable("message.redstoneutils.macro.alias_loop", "/" + root).getString());
             }
 
             String arguments = MacroCommandText.commandArguments(currentCommand);
@@ -52,7 +53,7 @@ public final class CommandCommand {
             expanded = true;
         }
 
-        return new Expansion(currentCommand, expanded, "Macro alias expansion is too deep");
+        return new Expansion(currentCommand, expanded, Component.translatable("message.redstoneutils.macro.alias_depth").getString());
     }
 
     static void withoutAliasExpansion(Runnable runnable) {

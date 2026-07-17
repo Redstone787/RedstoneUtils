@@ -3,6 +3,7 @@ package org.main.redstoneutils.client.teleport;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.phys.BlockHitResult;
@@ -72,7 +73,12 @@ public final class TpUtil {
     }
 
     private static void sendTeleportFeedback(Vec3 targetPos) {
-        RedstoneMessages.popup("Teleported to: " + (int) targetPos.x + " " + (int) targetPos.y + " " + (int) targetPos.z);
+        RedstoneMessages.popup(Component.translatable(
+                "message.redstoneutils.teleported",
+                (int) targetPos.x,
+                (int) targetPos.y,
+                (int) targetPos.z
+        ));
     }
 
     private static String formatTeleportCommand(Vec3 targetPos) {

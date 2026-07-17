@@ -36,6 +36,7 @@ import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import org.main.redstoneutils.client.config.RedstoneUtilsConfig;
+import org.main.redstoneutils.client.overlay.OverlayFreeze;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -49,7 +50,6 @@ public final class AutoWirePreviewOverlay {
     private static final float STROKE_WIDTH = 2.0F;
     private static final double BOX_INFLATE = 0.002D;
     private static final Direction[] MODEL_DIRECTIONS = Direction.values();
-    private static final GizmoStyle PREVIEW_STYLE = GizmoStyle.strokeAndFill(STROKE_COLOR, STROKE_WIDTH, FILL_COLOR);
 
     private static PreviewRenderData previewRenderData = null;
     private static boolean visible = RedstoneUtilsConfig.isWirePreviewOverlayVisible();
@@ -84,6 +84,7 @@ public final class AutoWirePreviewOverlay {
     }
 
     private static void extract(LevelExtractionContext context) {
+        if (OverlayFreeze.wireFrozen() && previewRenderData != null) return;
         previewRenderData = null;
 
         Minecraft minecraft = Minecraft.getInstance();
@@ -238,20 +239,30 @@ public final class AutoWirePreviewOverlay {
 
     private static void renderQuads(List<BakedQuad> quads, PoseStack.Pose pose, VertexConsumer vertexConsumer, QuadInstance quadInstance) {
         for (BakedQuad quad : quads) {
-            quadInstance.setColor(MODEL_COLOR);
+            quadInstance.setColor(color(RedstoneUtilsConfig.wirePreviewColor(), 0.38F));
             vertexConsumer.putBakedQuad(pose, quad, quadInstance);
         }
     }
 
     private static void renderGizmos(LevelRenderContext context, PreviewRenderData renderData) {
         DrawableGizmoPrimitives primitives = new DrawableGizmoPrimitives();
+        GizmoStyle style = GizmoStyle.strokeAndFill(
+                color(RedstoneUtilsConfig.wirePreviewColor(), 1.0F),
+                RedstoneUtilsConfig.getOverlayLineWidth(),
+                color(RedstoneUtilsConfig.wirePreviewColor(), 0.22F)
+        );
         for (PreviewPart part : renderData.parts()) {
             for (AABB box : part.boxes()) {
-                new CuboidGizmo(box, PREVIEW_STYLE, false).emit(primitives, 1.0F);
+                new CuboidGizmo(box, style, false).emit(primitives, 1.0F);
             }
         }
 
-        primitives.submit(context.submitNodeCollector(), context.levelState().cameraRenderState, false);
+        primitives.submit(context.submitNodeCollector(), context.levelState().cameraRenderState, RedstoneUtilsConfig.renderOverlaysThroughWalls());
+    }
+
+    private static int color(int color, float alphaMultiplier) {
+        int alpha = Math.clamp(Math.round((color >>> 24) * RedstoneUtilsConfig.getOverlayOpacity() * alphaMultiplier), 0, 255);
+        return color & 0x00FFFFFF | alpha << 24;
     }
 
     private record PlacementPreview(BlockPos blockPos, BlockState blockState, Item item) {

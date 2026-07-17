@@ -2,8 +2,10 @@ package org.main.redstoneutils.server.autowire;
 
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -23,6 +25,8 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
+import org.main.redstoneutils.network.RedstoneUtilsNetworking;
+import org.main.redstoneutils.server.history.ChangeHistory;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -181,29 +185,46 @@ public final class ServerAutoWire {
         return playerStates.computeIfAbsent(uuid, ignored -> new PlayerWireState());
     }
 
-    private static boolean placeOnTop(ServerLevel level, ServerPlayer player, BlockPos supportBlockPos, PlaceableBlock block) {
+    private static PlacementResult placeOnTop(ServerLevel level, ServerPlayer player, BlockPos supportBlockPos, PlaceableBlock block) {
         return placeOnTop(level, player, supportBlockPos, block.defaultState(playerFacing(player), player), block.item());
     }
 
-    private static boolean placeOnTop(ServerLevel level, ServerPlayer player, BlockPos supportBlockPos, PlaceableBlock block, Direction facing) {
+    private static PlacementResult placeOnTop(ServerLevel level, ServerPlayer player, BlockPos supportBlockPos, PlaceableBlock block, Direction facing) {
         return placeOnTop(level, player, supportBlockPos, block.defaultState(facing, player), block.item());
     }
 
-    private static boolean placeOnTop(ServerLevel level, ServerPlayer player, BlockPos supportBlockPos, BlockState blockState, Item item) {
+    private static PlacementResult placeOnTop(ServerLevel level, ServerPlayer player, BlockPos supportBlockPos, BlockState blockState, Item item) {
         BlockPos blockPos = supportBlockPos.above();
         BlockState placementState = resolvePlacementState(player, supportBlockPos, blockState, item);
 
-        if (!canPlace(level, blockPos, placementState)) {
-            return false;
-        }
+        if (!level.isInWorldBounds(blockPos)) return PlacementResult.OUTSIDE_WORLD;
+        if (!player.mayInteract(level, blockPos)) return PlacementResult.NO_PERMISSION;
 
+        BlockState currentState = level.getBlockState(blockPos);
+        if (!canReplace(currentState, placementState)) return PlacementResult.TARGET_OCCUPIED;
+        if (!placementState.canSurvive(level, blockPos)) return PlacementResult.CANNOT_SURVIVE;
+
+        ChangeHistory.Transaction transaction = ChangeHistory.begin(
+                player,
+                Component.translatable("history.redstoneutils.autowire")
+        );
+        transaction.capture(level, blockPos);
+        for (Direction direction : Direction.Plane.HORIZONTAL) {
+            transaction.capture(level, blockPos.relative(direction));
+        }
         if (!level.setBlockAndUpdate(blockPos, placementState)) {
-            return false;
+            transaction.rollback();
+            return PlacementResult.PLACEMENT_REJECTED;
         }
 
         updatePlacedDiode(level, blockPos, placementState);
         refreshNearbyRedstoneWires(level, blockPos, player);
-        return true;
+        if (!level.getBlockState(blockPos).is(placementState.getBlock())) {
+            transaction.rollback();
+            return PlacementResult.CANNOT_SURVIVE;
+        }
+        transaction.commit();
+        return PlacementResult.SUCCESS;
     }
 
     private static BlockState resolvePlacementState(ServerPlayer player, BlockPos supportBlockPos, BlockState fallbackState, Item item) {
@@ -222,11 +243,6 @@ public final class ServerAutoWire {
         }
 
         return placementState;
-    }
-
-    private static boolean canPlace(Level level, BlockPos blockPos, BlockState blockState) {
-        BlockState currentState = level.getBlockState(blockPos);
-        return canReplace(currentState, blockState) && blockState.canSurvive(level, blockPos);
     }
 
     private static boolean canReplace(BlockState currentState, BlockState replacementState) {
@@ -335,7 +351,9 @@ public final class ServerAutoWire {
         }
 
         private boolean normalWire(ServerLevel level, ServerPlayer player, BlockPos placedBlockPos) {
-            return ServerAutoWire.placeOnTop(level, player, placedBlockPos, PlaceableBlock.REDSTONE_WIRE);
+            PlacementResult result = ServerAutoWire.placeOnTop(level, player, placedBlockPos, PlaceableBlock.REDSTONE_WIRE);
+            reportFailure(player, result, Blocks.REDSTONE_WIRE.defaultBlockState());
+            return result == PlacementResult.SUCCESS;
         }
 
         private void reset() {
@@ -482,8 +500,9 @@ public final class ServerAutoWire {
         }
 
         private boolean placeRepeater(ServerLevel level, ServerPlayer player, BlockPos placedBlockPos, BlockPos targetBlockPos, Direction facing) {
-            boolean placed = ServerAutoWire.placeOnTop(level, player, placedBlockPos, PlaceableBlock.REPEATER, facing);
-            if (!placed) {
+            PlacementResult result = ServerAutoWire.placeOnTop(level, player, placedBlockPos, PlaceableBlock.REPEATER, facing);
+            if (result != PlacementResult.SUCCESS) {
+                reportFailure(player, result, Blocks.REPEATER.defaultBlockState());
                 return false;
             }
 
@@ -493,8 +512,9 @@ public final class ServerAutoWire {
         }
 
         private boolean placeComparator(ServerLevel level, ServerPlayer player, BlockPos placedBlockPos, BlockPos targetBlockPos, Direction facing) {
-            boolean placed = ServerAutoWire.placeOnTop(level, player, placedBlockPos, PlaceableBlock.COMPARATOR, facing);
-            if (!placed) {
+            PlacementResult result = ServerAutoWire.placeOnTop(level, player, placedBlockPos, PlaceableBlock.COMPARATOR, facing);
+            if (result != PlacementResult.SUCCESS) {
+                reportFailure(player, result, Blocks.COMPARATOR.defaultBlockState());
                 return false;
             }
 
@@ -505,15 +525,49 @@ public final class ServerAutoWire {
 
         private boolean placeElevatedBlock(ServerLevel level, ServerPlayer player, BlockPos placedBlockPos, BlockPos targetBlockPos, BlockState blockState, Item item) {
             if (blockState == null) {
+                reportFailure(player, PlacementResult.MISSING_SUPPORT, Blocks.AIR.defaultBlockState());
                 return false;
             }
-            if (!ServerAutoWire.placeOnTop(level, player, placedBlockPos, blockState, item)) {
+            PlacementResult result = ServerAutoWire.placeOnTop(level, player, placedBlockPos, blockState, item);
+            if (result != PlacementResult.SUCCESS) {
+                reportFailure(player, result, blockState);
                 return false;
             }
 
             lastAutoWiredBlockPos = targetBlockPos;
             redstoneDustRunLength = 0;
             return true;
+        }
+    }
+
+    private static void reportFailure(ServerPlayer player, PlacementResult result, BlockState intendedState) {
+        if (result == PlacementResult.SUCCESS || player == null) return;
+        String translationKey = intendedState == null
+                ? Blocks.AIR.getDescriptionId()
+                : intendedState.getBlock().getDescriptionId();
+        if (ServerPlayNetworking.canSend(player, RedstoneUtilsNetworking.AutoWireFeedbackPayload.TYPE)) {
+            ServerPlayNetworking.send(player, new RedstoneUtilsNetworking.AutoWireFeedbackPayload(result.key, translationKey));
+            return;
+        }
+        player.sendSystemMessage(Component.translatable(
+                "message.redstoneutils.autowire.failure." + result.key,
+                Component.translatable(translationKey)
+        ));
+    }
+
+    private enum PlacementResult {
+        SUCCESS("success"),
+        TARGET_OCCUPIED("target_occupied"),
+        CANNOT_SURVIVE("cannot_survive"),
+        OUTSIDE_WORLD("outside_world"),
+        NO_PERMISSION("no_permission"),
+        PLACEMENT_REJECTED("placement_rejected"),
+        MISSING_SUPPORT("missing_support");
+
+        private final String key;
+
+        PlacementResult(String key) {
+            this.key = key;
         }
     }
 

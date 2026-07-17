@@ -291,6 +291,10 @@ public enum SignalBlockVariant {
         return displayName + " supports signal strengths " + supportedStrengths;
     }
 
+    public String supportedStrengths() {
+        return supportedStrengths;
+    }
+
     private java.util.stream.Stream<String> names() {
         return java.util.stream.Stream.concat(
                 java.util.stream.Stream.of(key),

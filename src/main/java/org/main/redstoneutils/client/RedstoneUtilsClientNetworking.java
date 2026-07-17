@@ -1,7 +1,9 @@
 package org.main.redstoneutils.client;
 
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.minecraft.network.chat.Component;
 import org.main.redstoneutils.client.autowire.WireType;
+import org.main.redstoneutils.client.ui.RedstoneMessages;
 import org.main.redstoneutils.network.RedstoneUtilsNetworking;
 
 import java.util.Locale;
@@ -14,6 +16,12 @@ public final class RedstoneUtilsClientNetworking {
     public static void init() {
         ClientPlayNetworking.registerGlobalReceiver(RedstoneUtilsNetworking.ClientCommandPayload.TYPE, (payload, context) ->
                 context.client().execute(() -> RedstoneUtilsClientActions.run(payload.action(), payload.value()))
+        );
+        ClientPlayNetworking.registerGlobalReceiver(RedstoneUtilsNetworking.AutoWireFeedbackPayload.TYPE, (payload, context) ->
+                context.client().execute(() -> RedstoneMessages.popup(Component.translatable(
+                        "message.redstoneutils.autowire.failure." + payload.reason(),
+                        Component.translatable(payload.componentTranslationKey())
+                )))
         );
     }
 
