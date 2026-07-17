@@ -20,11 +20,11 @@ record TargetedBlock(
         Minecraft client = Minecraft.getInstance();
         LocalPlayer player = client.player;
         if (player == null || client.level == null) {
-            source.sendFeedback(Component.literal("No active player"));
+            source.sendFeedback(Component.translatable("message.redstoneutils.no_player"));
             return Optional.empty();
         }
         if (!(client.hitResult instanceof BlockHitResult blockHitResult) || blockHitResult.getType() != HitResult.Type.BLOCK) {
-            source.sendFeedback(Component.literal("Look at a block first"));
+            source.sendFeedback(Component.translatable("message.redstoneutils.look_at_block"));
             return Optional.empty();
         }
 

@@ -7,6 +7,7 @@ import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -28,6 +29,7 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.RedstoneSide;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
+import org.main.redstoneutils.client.ui.RedstoneMessages;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -62,14 +64,22 @@ public final class AutoWirePlacement {
     public static boolean placeOnTop(Level level, BlockPos supportBlockPos, BlockState blockState, Item item) {
         BlockPos blockPos = supportBlockPos.above();
 
-        if (!canPlace(level, blockPos, blockState)) {
+        BlockState currentState = level.getBlockState(blockPos);
+        if (!canReplace(currentState, blockState)) {
+            reportFailure("target_occupied", blockState);
+            return false;
+        }
+        if (!blockState.canSurvive(level, blockPos)) {
+            reportFailure("cannot_survive", blockState);
             return false;
         }
         if (placeOnIntegratedServer(level, supportBlockPos, blockPos, blockState, item)) {
             return true;
         }
 
-        return placeWithItem(supportBlockPos, item);
+        boolean placed = placeWithItem(supportBlockPos, item);
+        if (!placed) reportFailure("missing_item", blockState);
+        return placed;
     }
 
     public static boolean placeOnTop(Level level, BlockPos supportBlockPos, BlockState blockState, Item item, Direction facing) {
@@ -186,14 +196,23 @@ public final class AutoWirePlacement {
                         item,
                         remainingRetries - 1
                 ));
-            }
+            } else reportFailure(
+                    canReplace(serverLevel.getBlockState(blockPos), blockState) ? "cannot_survive" : "target_occupied",
+                    blockState
+            );
             return;
         }
 
         ServerPlayer serverPlayer = playerUuid == null ? null : serverLevel.getServer().getPlayerList().getPlayer(playerUuid);
-        serverLevel.setBlockAndUpdate(blockPos, blockState);
+        if (!serverLevel.setBlockAndUpdate(blockPos, blockState)) {
+            reportFailure("placement_rejected", blockState);
+            return;
+        }
         updatePlacedDiode(serverLevel, blockPos, blockState);
         refreshNearbyRedstoneWires(serverLevel, blockPos, serverPlayer);
+        if (!serverLevel.getBlockState(blockPos).is(blockState.getBlock())) {
+            reportFailure("cannot_survive", blockState);
+        }
     }
 
     private static void updatePlacedDiode(ServerLevel serverLevel, BlockPos blockPos, BlockState blockState) {
@@ -271,6 +290,16 @@ public final class AutoWirePlacement {
 
     private static boolean canReplaceRedstoneWire(BlockState currentState, BlockState replacementState) {
         return currentState.getBlock() == Blocks.REDSTONE_WIRE && replacementState.getBlock() != Blocks.REDSTONE_WIRE;
+    }
+
+    static void reportFailure(String reason, BlockState intendedState) {
+        String key = intendedState == null
+                ? Blocks.AIR.getDescriptionId()
+                : intendedState.getBlock().getDescriptionId();
+        RedstoneMessages.popup(Component.translatable(
+                "message.redstoneutils.autowire.failure." + reason,
+                Component.translatable(key)
+        ));
     }
 
     private static boolean canSurvivePreviewPlacement(Level level, BlockPos supportBlockPos, BlockPos blockPos, BlockState blockState, BlockState previewSupportBlockState) {

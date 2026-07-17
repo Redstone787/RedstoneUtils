@@ -13,17 +13,18 @@ public final class RedstoneUtilsServerNetworking {
 
     public static void init() {
         ServerPlayNetworking.registerGlobalReceiver(RedstoneUtilsNetworking.SetAutoWirePayload.TYPE, (payload, context) -> {
-            if (!RedstoneUtilsCommands.canUse(context.player().createCommandSourceStack())) {
+            if (!RedstoneUtilsCommands.canUseAutoWire(context.player().createCommandSourceStack())) {
+                context.player().sendSystemMessage(Component.translatable("message.redstoneutils.permission.autowire"));
                 return;
             }
 
             WireType wireType = WireType.find(payload.mode()).orElse(WireType.NONE);
             ServerAutoWire.setWireType(context.player(), wireType);
-            context.player().sendSystemMessage(Component.literal("AutoWire: " + wireType.displayName()));
         });
 
         ServerPlayNetworking.registerGlobalReceiver(RedstoneUtilsNetworking.TeleportPayload.TYPE, (payload, context) -> {
-            if (!RedstoneUtilsCommands.canUse(context.player().createCommandSourceStack())) {
+            if (!RedstoneUtilsCommands.canUseTeleport(context.player().createCommandSourceStack())) {
+                context.player().sendSystemMessage(Component.translatable("message.redstoneutils.permission.teleport"));
                 return;
             }
 

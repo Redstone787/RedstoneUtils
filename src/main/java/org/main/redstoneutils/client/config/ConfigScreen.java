@@ -2,708 +2,314 @@ package org.main.redstoneutils.client.config;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import org.main.redstoneutils.client.autowire.AutoWireHandler;
-import org.main.redstoneutils.client.autowire.WireType;
 import org.main.redstoneutils.client.autowire.AutoWirePreviewOverlay;
+import org.main.redstoneutils.client.autowire.WireType;
+import org.main.redstoneutils.client.bud.BudSwitchOverlay;
+import org.main.redstoneutils.client.overlay.OverlayFreeze;
 import org.main.redstoneutils.client.sculk.SculkSensorOverlay;
 import org.main.redstoneutils.client.ui.RedstoneMessages;
 import org.main.redstoneutils.client.ui.RedstoneOverlay;
+import org.main.redstoneutils.client.ui.RedstoneUi;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 public final class ConfigScreen extends Screen {
 
-    private static final int PANEL_MIN_WIDTH = 420;
-    private static final int PANEL_MAX_WIDTH = 560;
-    private static final int PANEL_MAX_HEIGHT = 420;
-    private static final int PANEL_PADDING = 12;
-    private static final int HEADER_HEIGHT = 68;
-    private static final int FOOTER_HEIGHT = 38;
-    private static final int ROW_HEIGHT = 82;
-    private static final int HELP_ROW_HEIGHT = 76;
-    private static final int TAB_WIDTH = 116;
-    private static final int TAB_HEIGHT = 20;
-    private static final int BUTTON_WIDTH = 122;
+    private static final int PANEL_WIDTH = 600;
+    private static final int PANEL_HEIGHT = 430;
+    private static final int HEADER = 80;
+    private static final int FOOTER = 42;
+    private static final int ROW_HEIGHT = 66;
+    private static final int VALUE_WIDTH = 126;
+    private static final int RESET_WIDTH = 24;
     private static final int BUTTON_HEIGHT = 24;
-    private static final int SCROLLBAR_WIDTH = 5;
-    private static final int SCROLLBAR_GAP = 8;
-    private static final int SCROLLBAR_MIN_THUMB_HEIGHT = 22;
-    private static final int GAP = 8;
-    private static final int CONTROL_RIGHT_INSET = 14;
 
-    private static final int SHADOW_COLOR = 0xD116171A;
-    private static final int PANEL_COLOR = 0xE62B2D31;
-    private static final int PANEL_BORDER_COLOR = 0xF05B6068;
-    private static final int PANEL_HIGHLIGHT_COLOR = 0xFF7B8088;
-    private static final int ROW_COLOR = 0x8033363C;
-    private static final int ROW_ALT_COLOR = 0x662B2D31;
-    private static final int ROW_HOVER_COLOR = 0xA0454A52;
-    private static final int BUTTON_COLOR = 0xE642454C;
-    private static final int BUTTON_HOVER_COLOR = 0xE66A707A;
-    private static final int BUTTON_DANGER_COLOR = 0xE65A3535;
-    private static final int BUTTON_BORDER_COLOR = 0xF05B6068;
-    private static final int SCROLLBAR_TRACK_COLOR = 0x6633363C;
-    private static final int SCROLLBAR_THUMB_COLOR = 0xD07B8088;
-    private static final int TEXT_COLOR = 0xFFFFFFFF;
-    private static final int MUTED_TEXT_COLOR = 0xFFB8BEC8;
-    private static final int DETAIL_TEXT_COLOR = 0xFFD5DAE2;
-
-    private final List<ConfigOption> options = createOptions();
-    private final List<HelpEntry> helpEntries = createHelpEntries();
-    private Tab activeTab = Tab.SETTINGS;
-    private double scrollOffset;
-    private boolean draggingScrollbar;
+    private final List<Option> options = createOptions();
+    private Category category = Category.ALL;
+    private EditBox searchBox;
+    private double scroll;
 
     public ConfigScreen() {
-        super(Component.literal("RedstoneUtils Config"));
+        super(Component.translatable("screen.redstoneutils.config"));
     }
 
     public static void open() {
-        Minecraft minecraft = Minecraft.getInstance();
-        minecraft.execute(() -> minecraft.gui.setScreen(new ConfigScreen()));
+        Minecraft client = Minecraft.getInstance();
+        client.execute(() -> client.gui.setScreen(new ConfigScreen()));
     }
 
     @Override
-    public void extractBackground(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float deltaTicks) {
+    protected void init() {
+        super.init();
+        Layout layout = layout();
+        searchBox = addWidget(new EditBox(
+                font,
+                layout.x + 242,
+                layout.y + 45,
+                210,
+                22,
+                Component.translatable("config.redstoneutils.search")
+        ));
+        searchBox.setHint(Component.translatable("config.redstoneutils.search"));
+        searchBox.setMaxLength(80);
+        searchBox.setResponder(ignored -> scroll = 0);
     }
+
+    @Override public void extractBackground(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float deltaTicks) { }
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float deltaTicks) {
-        Layout layout = layout(graphics.guiWidth(), graphics.guiHeight());
-        scrollOffset = clampScroll(layout, scrollOffset);
+        Layout layout = layout();
+        List<Option> visible = visibleOptions();
+        scroll = Mth.clamp(scroll, 0, maxScroll(layout, visible));
+        RedstoneUi.drawPanel(graphics, layout.x, layout.y, layout.width, layout.height);
+        graphics.text(font, title, layout.x + 14, layout.y + 10, RedstoneUi.TEXT_COLOR, false);
+        graphics.text(font, Component.translatable("screen.redstoneutils.config.profile", RedstoneUtilsConfig.activeProfile()), layout.x + 14, layout.y + 27, RedstoneUi.MUTED_TEXT_COLOR, false);
+        drawButton(graphics, category.label(), layout.x + 14, layout.y + 45, 216, 22,
+                RedstoneUi.contains(mouseX, mouseY, layout.x + 14, layout.y + 45, 216, 22));
+        searchBox.extractWidgetRenderState(graphics, mouseX, mouseY, deltaTicks);
 
-        graphics.nextStratum();
-        drawPanel(graphics, layout);
-        graphics.enableScissor(layout.contentLeft(), layout.contentY(), layout.contentRight(), layout.contentY() + layout.contentHeight());
-        if (activeTab == Tab.SETTINGS) {
-            drawOptions(graphics, layout, mouseX, mouseY);
-        } else {
-            drawHelp(graphics, layout);
+        graphics.enableScissor(layout.contentLeft(), layout.contentTop(), layout.contentRight(), layout.contentBottom());
+        for (int index = 0; index < visible.size(); index++) {
+            Option option = visible.get(index);
+            int rowY = layout.contentTop() + index * ROW_HEIGHT - (int) scroll;
+            if (rowY + ROW_HEIGHT < layout.contentTop() || rowY > layout.contentBottom()) continue;
+            int color = index % 2 == 0 ? RedstoneUi.ROW_COLOR : RedstoneUi.ROW_ALT_COLOR;
+            graphics.fill(layout.contentLeft(), rowY + 2, layout.contentRight(), rowY + ROW_HEIGHT - 3, color);
+            graphics.outline(layout.contentLeft(), rowY + 2, layout.contentWidth(), ROW_HEIGHT - 5, RedstoneUi.PANEL_BORDER_COLOR);
+            int textX = layout.contentLeft() + 9;
+            int textWidth = layout.valueX() - textX - 8;
+            graphics.text(font, Component.translatable(option.titleKey), textX, rowY + 9, RedstoneUi.TEXT_COLOR, false);
+            RedstoneUi.drawWrappedText(graphics, font, Component.translatable(option.descriptionKey).getString(), textX, rowY + 25, textWidth, 2, RedstoneUi.MUTED_TEXT_COLOR);
+            boolean valueHovered = RedstoneUi.contains(mouseX, mouseY, layout.valueX(), rowY + 8, VALUE_WIDTH, BUTTON_HEIGHT);
+            drawButton(graphics, option.value.get(), layout.valueX(), rowY + 8, VALUE_WIDTH, BUTTON_HEIGHT, valueHovered);
+            boolean resetHovered = RedstoneUi.contains(mouseX, mouseY, layout.resetX(), rowY + 8, RESET_WIDTH, BUTTON_HEIGHT);
+            drawButton(graphics, "↺", layout.resetX(), rowY + 8, RESET_WIDTH, BUTTON_HEIGHT, resetHovered);
+            if (valueHovered) {
+                graphics.setTooltipForNextFrame(Component.translatable(option.tooltipKey), mouseX, mouseY);
+            } else if (resetHovered) {
+                graphics.setTooltipForNextFrame(Component.translatable("config.redstoneutils.reset_one"), mouseX, mouseY);
+            }
         }
         graphics.disableScissor();
-        drawScrollbar(graphics, layout);
-        drawHeader(graphics, layout);
-        drawFooter(graphics, layout, mouseX, mouseY);
+        drawScrollbar(graphics, layout, visible.size());
+
+        int footerY = layout.y + layout.height - 33;
+        drawButton(graphics, Component.translatable("config.redstoneutils.reset_profile").getString(), layout.x + 14, footerY, 132, 24,
+                RedstoneUi.contains(mouseX, mouseY, layout.x + 14, footerY, 132, 24));
+        drawButton(graphics, Component.translatable("gui.done").getString(), layout.x + layout.width - 106, footerY, 92, 24,
+                RedstoneUi.contains(mouseX, mouseY, layout.x + layout.width - 106, footerY, 92, 24));
     }
 
     @Override
     public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-        Layout layout = layout(width, height);
-        double mouseX = event.x();
-        double mouseY = event.y();
-
-        if (event.button() == InputConstants.MOUSE_BUTTON_LEFT) {
-            if (isScrollbarVisible(layout) && contains(mouseX, mouseY, layout.scrollbarX() - 2, layout.contentY(), SCROLLBAR_WIDTH + 4, layout.contentHeight())) {
-                draggingScrollbar = true;
-                scrollToMouse(layout, mouseY);
-                AbstractWidget.playButtonClickSound(Minecraft.getInstance().getSoundManager());
-                return true;
-            }
-
-            if (selectTab(layout, mouseX, mouseY)) {
-                AbstractWidget.playButtonClickSound(Minecraft.getInstance().getSoundManager());
-                return true;
-            }
-
-            if (contains(mouseX, mouseY, layout.doneX(), layout.footerButtonY(), BUTTON_WIDTH, BUTTON_HEIGHT)) {
-                onClose();
-                AbstractWidget.playButtonClickSound(Minecraft.getInstance().getSoundManager());
-                return true;
-            }
-            if (activeTab == Tab.SETTINGS && contains(mouseX, mouseY, layout.resetX(), layout.footerButtonY(), BUTTON_WIDTH, BUTTON_HEIGHT)) {
-                resetDefaults();
-                AbstractWidget.playButtonClickSound(Minecraft.getInstance().getSoundManager());
-                return true;
-            }
-
-            int optionIndex = activeTab == Tab.SETTINGS ? optionIndexAt(layout, mouseX, mouseY) : -1;
-            if (optionIndex >= 0) {
-                options.get(optionIndex).next().run();
-                AbstractWidget.playButtonClickSound(Minecraft.getInstance().getSoundManager());
-                return true;
-            }
-        }
-
-        return true;
-    }
-
-    @Override
-    public boolean mouseReleased(MouseButtonEvent event) {
-        draggingScrollbar = false;
-        return true;
-    }
-
-    @Override
-    public boolean mouseDragged(MouseButtonEvent event, double dragX, double dragY) {
-        if (draggingScrollbar) {
-            scrollToMouse(layout(width, height), event.y());
+        Layout layout = layout();
+        if (searchBox.mouseClicked(event, doubleClick)) return true;
+        if (event.button() != InputConstants.MOUSE_BUTTON_LEFT) return true;
+        if (RedstoneUi.contains(event.x(), event.y(), layout.x + 14, layout.y + 45, 216, 22)) {
+            category = Category.values()[(category.ordinal() + 1) % Category.values().length];
+            scroll = 0;
+            click();
             return true;
         }
-
+        List<Option> visible = visibleOptions();
+        for (int index = 0; index < visible.size(); index++) {
+            int rowY = layout.contentTop() + index * ROW_HEIGHT - (int) scroll;
+            if (RedstoneUi.contains(event.x(), event.y(), layout.valueX(), rowY + 8, VALUE_WIDTH, BUTTON_HEIGHT)) {
+                visible.get(index).edit.run();
+                click();
+                return true;
+            }
+            if (RedstoneUi.contains(event.x(), event.y(), layout.resetX(), rowY + 8, RESET_WIDTH, BUTTON_HEIGHT)) {
+                visible.get(index).reset.run();
+                click();
+                return true;
+            }
+        }
+        int footerY = layout.y + layout.height - 33;
+        if (RedstoneUi.contains(event.x(), event.y(), layout.x + 14, footerY, 132, 24)) {
+            RedstoneUtilsConfig.resetActiveProfile();
+            applyProfileSettings();
+            click();
+            return true;
+        }
+        if (RedstoneUi.contains(event.x(), event.y(), layout.x + layout.width - 106, footerY, 92, 24)) {
+            onClose();
+            click();
+        }
         return true;
     }
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
-        Layout layout = layout(width, height);
-        if (contentHeight() <= layout.contentHeight()) return true;
-
-        scrollOffset = clampScroll(layout, scrollOffset - scrollY * rowHeight());
+        scroll = Mth.clamp(scroll - scrollY * ROW_HEIGHT, 0, maxScroll(layout(), visibleOptions()));
         return true;
     }
 
     @Override
     public boolean keyPressed(KeyEvent event) {
-        int key = event.key();
-        if (key == InputConstants.KEY_ESCAPE) {
+        if (searchBox.keyPressed(event)) return true;
+        if (event.key() == InputConstants.KEY_ESCAPE) {
             onClose();
             return true;
         }
-        if (key == InputConstants.KEY_UP) {
-            scrollOffset = clampScroll(layout(width, height), scrollOffset - rowHeight());
-            return true;
-        }
-        if (key == InputConstants.KEY_DOWN) {
-            scrollOffset = clampScroll(layout(width, height), scrollOffset + rowHeight());
-            return true;
-        }
-
-        return true;
+        return super.keyPressed(event);
     }
 
     @Override
-    public boolean isPauseScreen() {
-        return false;
+    public boolean charTyped(CharacterEvent event) {
+        return searchBox.charTyped(event) || super.charTyped(event);
     }
 
-    @Override
-    public boolean isInGameUi() {
-        return true;
+    @Override public boolean isPauseScreen() { return false; }
+    @Override public boolean isInGameUi() { return true; }
+
+    private List<Option> visibleOptions() {
+        String query = searchBox == null ? "" : searchBox.getValue().strip().toLowerCase(Locale.ROOT);
+        return options.stream().filter(option -> category == Category.ALL || option.category == category)
+                .filter(option -> query.isEmpty()
+                        || Component.translatable(option.titleKey).getString().toLowerCase(Locale.ROOT).contains(query)
+                        || Component.translatable(option.descriptionKey).getString().toLowerCase(Locale.ROOT).contains(query))
+                .toList();
     }
 
-    private void drawPanel(GuiGraphicsExtractor graphics, Layout layout) {
-        graphics.fill(layout.x() + 3, layout.y() + 3, layout.x() + layout.width() + 3, layout.y() + layout.height() + 3, SHADOW_COLOR);
-        graphics.fill(layout.x(), layout.y(), layout.x() + layout.width(), layout.y() + layout.height(), PANEL_COLOR);
-        graphics.fill(layout.x(), layout.y(), layout.x() + layout.width(), layout.y() + 1, PANEL_HIGHLIGHT_COLOR);
-        graphics.outline(layout.x(), layout.y(), layout.width(), layout.height(), PANEL_BORDER_COLOR);
+    private void drawScrollbar(GuiGraphicsExtractor graphics, Layout layout, int rows) {
+        int total = rows * ROW_HEIGHT;
+        if (total <= layout.contentHeight()) return;
+        int x = layout.contentRight() + 4;
+        graphics.fill(x, layout.contentTop(), x + 5, layout.contentBottom(), RedstoneUi.SCROLLBAR_TRACK_COLOR);
+        int thumb = Math.max(24, layout.contentHeight() * layout.contentHeight() / total);
+        int y = layout.contentTop() + (int) ((layout.contentHeight() - thumb) * (scroll / Math.max(1, total - layout.contentHeight())));
+        graphics.fill(x, y, x + 5, y + thumb, RedstoneUi.SCROLLBAR_THUMB_COLOR);
     }
 
-    private void drawHeader(GuiGraphicsExtractor graphics, Layout layout) {
-        graphics.fill(layout.x() + 1, layout.y() + 1, layout.x() + layout.width() - 1, layout.contentY(), PANEL_COLOR);
-        graphics.fill(layout.x(), layout.y(), layout.x() + layout.width(), layout.y() + 1, PANEL_HIGHLIGHT_COLOR);
-        graphics.text(font, "RedstoneUtils Config", layout.x() + PANEL_PADDING, layout.y() + 8, TEXT_COLOR, false);
-        String subtitle = activeTab == Tab.SETTINGS
-                ? "Changes are saved immediately."
-                : "Commands, keybinds, and features at a glance.";
-        graphics.text(font, subtitle, layout.x() + PANEL_PADDING, layout.y() + 24, MUTED_TEXT_COLOR, false);
-
-        drawTab(graphics, "Settings", activeTab == Tab.SETTINGS, layout.settingsTabX(), layout.tabY());
-        drawTab(graphics, "Help", activeTab == Tab.HELP, layout.helpTabX(), layout.tabY());
+    private double maxScroll(Layout layout, List<Option> visible) {
+        return Math.max(0, visible.size() * ROW_HEIGHT - layout.contentHeight());
     }
 
-    private void drawOptions(GuiGraphicsExtractor graphics, Layout layout, int mouseX, int mouseY) {
-        int contentTop = layout.contentY();
-        int contentBottom = layout.contentY() + layout.contentHeight();
-        int rowWidth = layout.contentWidth();
-
-        for (int index = 0; index < options.size(); index++) {
-            int rowY = contentTop + index * ROW_HEIGHT - (int) Math.round(scrollOffset);
-            if (rowY + ROW_HEIGHT < contentTop || rowY > contentBottom) {
-                continue;
-            }
-
-            ConfigOption option = options.get(index);
-            int rowX = layout.contentLeft();
-            int rowColor = index % 2 == 0 ? ROW_COLOR : ROW_ALT_COLOR;
-            boolean hovered = contains(mouseX, mouseY, layout.controlX(), rowY + GAP, BUTTON_WIDTH, BUTTON_HEIGHT);
-            graphics.fill(rowX, rowY + 2, rowX + rowWidth, rowY + ROW_HEIGHT - 4, hovered ? ROW_HOVER_COLOR : rowColor);
-            graphics.outline(rowX, rowY + 2, rowWidth, ROW_HEIGHT - 6, PANEL_BORDER_COLOR);
-
-            int textX = rowX + 10;
-            int textWidth = layout.controlX() - textX - GAP;
-            graphics.text(font, option.title(), textX, rowY + 10, TEXT_COLOR, false);
-            int nextY = drawWrappedText(graphics, option.description(), textX, rowY + 25, textWidth, 2, MUTED_TEXT_COLOR);
-            drawWrappedText(graphics, option.valueDescription().get(), textX, nextY + 2, textWidth, 2, DETAIL_TEXT_COLOR);
-
-            drawButton(graphics, option.valueLabel().get(), layout.controlX(), rowY + GAP, BUTTON_WIDTH, BUTTON_HEIGHT, hovered, false);
-        }
+    private void drawButton(GuiGraphicsExtractor graphics, String label, int x, int y, int width, int height, boolean hovered) {
+        RedstoneUi.drawButton(graphics, font, label, x, y, width, height, hovered, RedstoneUi.ButtonTone.NORMAL);
     }
 
-    private void drawHelp(GuiGraphicsExtractor graphics, Layout layout) {
-        int contentTop = layout.contentY();
-        int contentBottom = layout.contentY() + layout.contentHeight();
-        int rowWidth = layout.contentWidth();
-
-        for (int index = 0; index < helpEntries.size(); index++) {
-            int rowY = contentTop + index * HELP_ROW_HEIGHT - (int) Math.round(scrollOffset);
-            if (rowY + HELP_ROW_HEIGHT < contentTop || rowY > contentBottom) {
-                continue;
-            }
-
-            HelpEntry entry = helpEntries.get(index);
-            int rowX = layout.contentLeft();
-            int rowColor = index % 2 == 0 ? ROW_COLOR : ROW_ALT_COLOR;
-            graphics.fill(rowX, rowY + 2, rowX + rowWidth, rowY + HELP_ROW_HEIGHT - 4, rowColor);
-            graphics.outline(rowX, rowY + 2, rowWidth, HELP_ROW_HEIGHT - 6, PANEL_BORDER_COLOR);
-
-            int textX = rowX + 10;
-            int textWidth = rowWidth - 20;
-            graphics.text(font, entry.title(), textX, rowY + 9, TEXT_COLOR, false);
-            int nextY = drawWrappedText(graphics, entry.usage(), textX, rowY + 23, textWidth, 1, DETAIL_TEXT_COLOR);
-            drawWrappedText(graphics, entry.description(), textX, nextY + 3, textWidth, 3, MUTED_TEXT_COLOR);
-        }
+    private void click() {
+        AbstractWidget.playButtonClickSound(Minecraft.getInstance().getSoundManager());
     }
 
-    private void drawFooter(GuiGraphicsExtractor graphics, Layout layout, int mouseX, int mouseY) {
-        int y = layout.footerButtonY();
-        graphics.fill(layout.x() + 1, layout.contentY() + layout.contentHeight(), layout.x() + layout.width() - 1, layout.y() + layout.height() - 1, PANEL_COLOR);
-        boolean resetHovered = activeTab == Tab.SETTINGS && contains(mouseX, mouseY, layout.resetX(), y, BUTTON_WIDTH, BUTTON_HEIGHT);
-        boolean doneHovered = contains(mouseX, mouseY, layout.doneX(), y, BUTTON_WIDTH, BUTTON_HEIGHT);
-        if (activeTab == Tab.SETTINGS) {
-            drawButton(graphics, "Defaults", layout.resetX(), y, BUTTON_WIDTH, BUTTON_HEIGHT, resetHovered, true);
-        }
-        drawButton(graphics, "Done", layout.doneX(), y, BUTTON_WIDTH, BUTTON_HEIGHT, doneHovered, false);
+    private Layout layout() {
+        int w = Math.min(PANEL_WIDTH, width - 20);
+        int h = Math.min(PANEL_HEIGHT, height - 20);
+        return new Layout((width - w) / 2, (height - h) / 2, w, h);
     }
 
-    private void drawScrollbar(GuiGraphicsExtractor graphics, Layout layout) {
-        if (!isScrollbarVisible(layout)) return;
-
-        int trackX = layout.scrollbarX();
-        int trackY = layout.contentY() + 4;
-        int trackHeight = layout.contentHeight() - 8;
-        int thumbHeight = scrollbarThumbHeight(layout, trackHeight);
-        int thumbY = scrollbarThumbY(layout, trackY, trackHeight, thumbHeight);
-
-        graphics.fill(trackX, trackY, trackX + SCROLLBAR_WIDTH, trackY + trackHeight, SCROLLBAR_TRACK_COLOR);
-        graphics.fill(trackX, thumbY, trackX + SCROLLBAR_WIDTH, thumbY + thumbHeight, SCROLLBAR_THUMB_COLOR);
-    }
-
-    private void drawTab(GuiGraphicsExtractor graphics, String label, boolean active, int x, int y) {
-        int color = active ? BUTTON_HOVER_COLOR : BUTTON_COLOR;
-        graphics.fill(x, y, x + TAB_WIDTH, y + TAB_HEIGHT, color);
-        graphics.outline(x, y, TAB_WIDTH, TAB_HEIGHT, BUTTON_BORDER_COLOR);
-        graphics.centeredText(font, label, x + TAB_WIDTH / 2, y + (TAB_HEIGHT - font.lineHeight) / 2, TEXT_COLOR);
-    }
-
-    private void drawButton(GuiGraphicsExtractor graphics, String label, int x, int y, int width, int height, boolean hovered, boolean danger) {
-        int color = hovered ? BUTTON_HOVER_COLOR : (danger ? BUTTON_DANGER_COLOR : BUTTON_COLOR);
-        graphics.fill(x, y, x + width, y + height, color);
-        graphics.outline(x, y, width, height, BUTTON_BORDER_COLOR);
-        graphics.centeredText(font, label, x + width / 2, y + (height - font.lineHeight) / 2, TEXT_COLOR);
-    }
-
-    private int drawWrappedText(GuiGraphicsExtractor graphics, String text, int x, int y, int maxWidth, int maxLines, int color) {
-        List<String> lines = wrap(font, text, maxWidth, maxLines);
-        for (int index = 0; index < lines.size(); index++) {
-            graphics.text(font, lines.get(index), x, y + index * (font.lineHeight + 1), color, false);
-        }
-
-        return y + lines.size() * (font.lineHeight + 1);
-    }
-
-    private int optionIndexAt(Layout layout, double mouseX, double mouseY) {
-        if (!contains(mouseX, mouseY, layout.controlX(), layout.contentY(), BUTTON_WIDTH, layout.contentHeight())) {
-            return -1;
-        }
-
-        int index = (int) ((mouseY - layout.contentY() + scrollOffset) / ROW_HEIGHT);
-        if (index < 0 || index >= options.size()) return -1;
-
-        int rowY = layout.contentY() + index * ROW_HEIGHT - (int) Math.round(scrollOffset);
-        if (!contains(mouseX, mouseY, layout.controlX(), rowY + GAP, BUTTON_WIDTH, BUTTON_HEIGHT)) {
-            return -1;
-        }
-
-        return index;
-    }
-
-    private boolean selectTab(Layout layout, double mouseX, double mouseY) {
-        if (contains(mouseX, mouseY, layout.settingsTabX(), layout.tabY(), TAB_WIDTH, TAB_HEIGHT)) {
-            setActiveTab(Tab.SETTINGS);
-            return true;
-        }
-        if (contains(mouseX, mouseY, layout.helpTabX(), layout.tabY(), TAB_WIDTH, TAB_HEIGHT)) {
-            setActiveTab(Tab.HELP);
-            return true;
-        }
-
-        return false;
-    }
-
-    private void setActiveTab(Tab tab) {
-        if (tab == null || tab == activeTab) return;
-        activeTab = tab;
-        scrollOffset = 0.0D;
-        draggingScrollbar = false;
-    }
-
-    private void resetDefaults() {
-        RedstoneUtilsConfig.resetToDefaults();
+    private static void applyProfileSettings() {
         RedstoneOverlay.setVisible(RedstoneUtilsConfig.isHudOverlayVisible());
         AutoWirePreviewOverlay.setVisible(RedstoneUtilsConfig.isWirePreviewOverlayVisible());
+        BudSwitchOverlay.setVisible(RedstoneUtilsConfig.isBudOverlayVisible());
         SculkSensorOverlay.setVisible(RedstoneUtilsConfig.isSculkOverlayVisible());
-        AutoWireHandler.setActiveWireType(RedstoneUtilsConfig.getActiveWireType());
-        RedstoneMessages.setDefaultTarget(RedstoneUtilsConfig.getMessageTarget());
-        SculkSensorOverlay.requestRefresh();
-        RedstoneMessages.popup("Config reset");
+        AutoWireHandler.reloadFromProfile();
     }
 
-    private static Layout layout(int screenWidth, int screenHeight) {
-        int width = Mth.clamp(screenWidth - 24, PANEL_MIN_WIDTH, PANEL_MAX_WIDTH);
-        int height = Mth.clamp(screenHeight - 24, 300, PANEL_MAX_HEIGHT);
-        int x = (screenWidth - width) / 2;
-        int y = (screenHeight - height) / 2;
-        int contentY = y + HEADER_HEIGHT;
-        int contentHeight = height - HEADER_HEIGHT - FOOTER_HEIGHT;
-        int controlX = x + width - PANEL_PADDING - CONTROL_RIGHT_INSET - SCROLLBAR_WIDTH - SCROLLBAR_GAP - BUTTON_WIDTH;
-        int footerButtonY = y + height - FOOTER_HEIGHT + 7;
+    private static List<Option> createOptions() {
+        List<Option> result = new ArrayList<>();
+        result.add(toggle(Category.GENERAL, "config.redstoneutils.hud", RedstoneUtilsConfig::isHudOverlayVisible, RedstoneOverlay::setVisible, true));
+        result.add(toggle(Category.GENERAL, "config.redstoneutils.status_hud", RedstoneUtilsConfig::isStatusHudVisible, RedstoneUtilsConfig::setStatusHudVisible, true));
+        result.add(choice(Category.GENERAL, "config.redstoneutils.status_anchor", RedstoneUtilsConfig.HudAnchor.values(), RedstoneUtilsConfig::getStatusHudAnchor, RedstoneUtilsConfig::setStatusHudAnchor, RedstoneUtilsConfig.HudAnchor.TOP_RIGHT));
+        result.add(choice(Category.GENERAL, "config.redstoneutils.feedback", RedstoneMessages.MessageTarget.values(), RedstoneMessages::getDefaultTarget, RedstoneMessages::setDefaultTarget, RedstoneMessages.MessageTarget.POPUP));
+        result.add(number(Category.GENERAL, "config.redstoneutils.teleport", 10, 1000, 0, RedstoneUtilsConfig::getTeleportMaxRange, RedstoneUtilsConfig::setTeleportMaxRange, 100));
 
-        return new Layout(x, y, width, height, contentY, contentHeight, controlX, footerButtonY);
+        result.add(choice(Category.AUTOWIRE, "config.redstoneutils.autowire", WireType.values(), AutoWireHandler::getActiveWireType, AutoWireHandler::setActiveWireType, WireType.NONE));
+        result.add(toggle(Category.AUTOWIRE, "config.redstoneutils.wire_preview", AutoWirePreviewOverlay::isVisible, AutoWirePreviewOverlay::setVisible, true));
+
+        result.add(toggle(Category.OVERLAYS, "config.redstoneutils.bud", BudSwitchOverlay::isVisible, BudSwitchOverlay::setVisible, true));
+        result.add(number(Category.OVERLAYS, "config.redstoneutils.bud_range", 4, 64, 0, () -> (double) RedstoneUtilsConfig.getBudTestRange(), value -> { RedstoneUtilsConfig.setBudTestRange(value.intValue()); BudSwitchOverlay.clear(); }, 8));
+        result.add(toggle(Category.OVERLAYS, "config.redstoneutils.sculk", SculkSensorOverlay::isVisible, SculkSensorOverlay::setVisible, false));
+        result.add(number(Category.OVERLAYS, "config.redstoneutils.sculk_distance", 16, 256, 0, () -> (double) RedstoneUtilsConfig.getSculkSensorSearchDistance(), value -> { RedstoneUtilsConfig.setSculkSensorSearchDistance(value.intValue()); SculkSensorOverlay.requestRefresh(); }, 96));
+        result.add(toggle(Category.OVERLAYS, "config.redstoneutils.freeze", OverlayFreeze::anyFrozen, ignored -> OverlayFreeze.toggleAll(), false));
+
+        result.add(choice(Category.ACCESSIBILITY, "config.redstoneutils.palette", RedstoneUtilsConfig.ColorPalette.values(), RedstoneUtilsConfig::getColorPalette, RedstoneUtilsConfig::setColorPalette, RedstoneUtilsConfig.ColorPalette.DEFAULT));
+        result.add(color(Category.ACCESSIBILITY, "config.redstoneutils.wire_color", RedstoneUtilsConfig::wirePreviewColor, RedstoneUtilsConfig::setWirePreviewColor, RedstoneUtilsConfig::resetWirePreviewColor));
+        result.add(color(Category.ACCESSIBILITY, "config.redstoneutils.risk_color", RedstoneUtilsConfig::budRiskColor, RedstoneUtilsConfig::setBudRiskColor, RedstoneUtilsConfig::resetBudRiskColor));
+        result.add(color(Category.ACCESSIBILITY, "config.redstoneutils.source_color", RedstoneUtilsConfig::budSourceColor, RedstoneUtilsConfig::setBudSourceColor, RedstoneUtilsConfig::resetBudSourceColor));
+        result.add(color(Category.ACCESSIBILITY, "config.redstoneutils.sculk_color", RedstoneUtilsConfig::sculkColor, RedstoneUtilsConfig::setSculkColor, RedstoneUtilsConfig::resetSculkColor));
+        result.add(number(Category.ACCESSIBILITY, "config.redstoneutils.opacity", 0.1, 1.0, 2, () -> (double) RedstoneUtilsConfig.getOverlayOpacity(), value -> RedstoneUtilsConfig.setOverlayOpacity(value.floatValue()), 0.85));
+        result.add(number(Category.ACCESSIBILITY, "config.redstoneutils.line_width", 1, 8, 1, () -> (double) RedstoneUtilsConfig.getOverlayLineWidth(), value -> RedstoneUtilsConfig.setOverlayLineWidth(value.floatValue()), 2));
+        result.add(toggle(Category.ACCESSIBILITY, "config.redstoneutils.through_walls", RedstoneUtilsConfig::renderOverlaysThroughWalls, RedstoneUtilsConfig::setOverlayThroughWalls, true));
+        result.add(choice(Category.ACCESSIBILITY, "config.redstoneutils.popup_anchor", RedstoneUtilsConfig.PopupAnchor.values(), RedstoneUtilsConfig::getPopupAnchor, RedstoneUtilsConfig::setPopupAnchor, RedstoneUtilsConfig.PopupAnchor.TOP_LEFT));
+        result.add(number(Category.ACCESSIBILITY, "config.redstoneutils.popup_duration", 1000, 15000, 0, () -> (double) RedstoneUtilsConfig.getPopupDurationMillis(), value -> RedstoneUtilsConfig.setPopupDurationMillis(value.intValue()), 3000));
+
+        result.add(number(Category.PERFORMANCE, "config.redstoneutils.overlay_distance", 8, 256, 0, () -> (double) RedstoneUtilsConfig.getOverlayMaxDistance(), value -> RedstoneUtilsConfig.setOverlayMaxDistance(value.intValue()), 128));
+        result.add(number(Category.PERFORMANCE, "config.redstoneutils.sculk_interval", 1, 100, 0, () -> (double) RedstoneUtilsConfig.getSculkRebuildIntervalTicks(), value -> { RedstoneUtilsConfig.setSculkRebuildIntervalTicks(value.intValue()); SculkSensorOverlay.requestRefresh(); }, 5));
+        return result;
     }
 
-    private double clampScroll(Layout layout, double value) {
-        return Mth.clamp(value, 0.0D, Math.max(0, contentHeight() - layout.contentHeight()));
+    private static Option toggle(Category category, String key, Supplier<Boolean> getter, Consumer<Boolean> setter, boolean defaultValue) {
+        return new Option(category, key + ".title", key + ".description", key + ".tooltip",
+                () -> Component.translatable(getter.get() ? "state.redstoneutils.on" : "state.redstoneutils.off").getString(),
+                () -> setter.accept(!getter.get()), () -> setter.accept(defaultValue));
     }
 
-    private double contentHeight() {
-        return activeTab == Tab.SETTINGS ? options.size() * ROW_HEIGHT : helpEntries.size() * HELP_ROW_HEIGHT;
+    private static <T> Option choice(Category category, String key, T[] values, Supplier<T> getter, Consumer<T> setter, T defaultValue) {
+        return new Option(category, key + ".title", key + ".description", key + ".tooltip",
+                () -> enumLabel(getter.get()), () -> {
+                    int index = Arrays.asList(values).indexOf(getter.get());
+                    setter.accept(values[(index + 1) % values.length]);
+                }, () -> setter.accept(defaultValue));
     }
 
-    private int rowHeight() {
-        return activeTab == Tab.SETTINGS ? ROW_HEIGHT : HELP_ROW_HEIGHT;
+    private static Option number(Category category, String key, double min, double max, int decimals,
+                                 Supplier<Double> getter, Consumer<Double> setter, double defaultValue) {
+        return new Option(category, key + ".title", key + ".description", key + ".tooltip",
+                () -> decimals == 0 ? Integer.toString((int) Math.round(getter.get())) : String.format(Locale.ROOT, "% ." + decimals + "f", getter.get()).strip(),
+                () -> Minecraft.getInstance().gui.setScreen(new NumericConfigScreen(
+                        Component.translatable(key + ".title"), min, max, decimals, getter.get(), setter, new ConfigScreen()
+                )), () -> setter.accept(defaultValue));
     }
 
-    private boolean isScrollbarVisible(Layout layout) {
-        return contentHeight() > layout.contentHeight();
+    private static Option color(Category category, String key, Supplier<Integer> getter, java.util.function.IntConsumer setter, Runnable reset) {
+        return new Option(category, key + ".title", key + ".description", key + ".tooltip",
+                () -> String.format(Locale.ROOT, "#%06X", getter.get() & 0xFFFFFF),
+                () -> Minecraft.getInstance().gui.setScreen(new ColorConfigScreen(
+                        Component.translatable(key + ".title"), getter.get(), setter, new ConfigScreen()
+                )), reset);
     }
 
-    private int scrollbarThumbHeight(Layout layout, int trackHeight) {
-        return Math.max(SCROLLBAR_MIN_THUMB_HEIGHT, (int) Math.round(trackHeight * layout.contentHeight() / contentHeight()));
+    private static String enumLabel(Object value) {
+        if (value instanceof WireType wireType) return wireType.getDisplayName();
+        String id = value == null ? "" : value.toString().toLowerCase(Locale.ROOT);
+        return Component.translatable("enum.redstoneutils." + id).getString();
     }
 
-    private int scrollbarThumbY(Layout layout, int trackY, int trackHeight, int thumbHeight) {
-        double maxScroll = Math.max(1.0D, contentHeight() - layout.contentHeight());
-        double progress = scrollOffset / maxScroll;
-        return trackY + (int) Math.round((trackHeight - thumbHeight) * progress);
+    private enum Category {
+        ALL, GENERAL, AUTOWIRE, OVERLAYS, ACCESSIBILITY, PERFORMANCE;
+        private String label() { return Component.translatable("config.redstoneutils.category." + name().toLowerCase(Locale.ROOT)).getString(); }
     }
 
-    private void scrollToMouse(Layout layout, double mouseY) {
-        int trackY = layout.contentY() + 4;
-        int trackHeight = layout.contentHeight() - 8;
-        int thumbHeight = scrollbarThumbHeight(layout, trackHeight);
-        double progress = (mouseY - trackY - thumbHeight / 2.0D) / Math.max(1.0D, trackHeight - thumbHeight);
-        double maxScroll = Math.max(0.0D, contentHeight() - layout.contentHeight());
-        scrollOffset = clampScroll(layout, progress * maxScroll);
-    }
+    private record Option(Category category, String titleKey, String descriptionKey, String tooltipKey,
+                          Supplier<String> value, Runnable edit, Runnable reset) { }
 
-    private static boolean contains(double mouseX, double mouseY, int x, int y, int width, int height) {
-        return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
-    }
-
-    private static List<String> wrap(Font font, String text, int maxWidth, int maxLines) {
-        List<String> lines = new ArrayList<>();
-        if (text == null || text.isBlank() || maxLines <= 0) return lines;
-
-        String[] words = text.split(" ");
-        StringBuilder line = new StringBuilder();
-        for (String word : words) {
-            String candidate = line.isEmpty() ? word : line + " " + word;
-            if (font.width(candidate) <= maxWidth) {
-                line.setLength(0);
-                line.append(candidate);
-                continue;
-            }
-
-            if (!line.isEmpty()) {
-                lines.add(line.toString());
-                if (lines.size() == maxLines) return finishWrappedLines(font, lines, maxWidth);
-            }
-
-            line.setLength(0);
-            line.append(word);
-        }
-
-        if (!line.isEmpty() && lines.size() < maxLines) {
-            lines.add(line.toString());
-        }
-
-        return lines;
-    }
-
-    private static List<String> finishWrappedLines(Font font, List<String> lines, int maxWidth) {
-        int lastIndex = lines.size() - 1;
-        String suffix = "...";
-        String line = lines.get(lastIndex);
-        if (font.width(line + suffix) <= maxWidth) {
-            lines.set(lastIndex, line + suffix);
-            return lines;
-        }
-
-        lines.set(lastIndex, font.plainSubstrByWidth(line, Math.max(0, maxWidth - font.width(suffix))) + suffix);
-        return lines;
-    }
-
-    private static List<ConfigOption> createOptions() {
-        List<ConfigOption> options = new ArrayList<>();
-
-        options.add(toggle(
-                "HUD Overlay",
-                "Shows or hides the RedstoneUtils HUD layer.",
-                "Controls popups and the wire selection wheel. The config screen remains usable either way.",
-                RedstoneUtilsConfig::isHudOverlayVisible,
-                RedstoneOverlay::setVisible
-        ));
-        options.add(choice(
-                "Active Wire Mode",
-                "Controls what is automatically placed above a support block after you place it.",
-                Arrays.stream(WireType.values())
-                        .map(wireType -> new OptionValue<>(wireType, wireType.getDisplayName(), wireTypeDescription(wireType)))
-                        .toList(),
-                AutoWireHandler::getActiveWireType,
-                AutoWireHandler::setActiveWireType
-        ));
-        options.add(toggle(
-                "Wire Preview",
-                "Shows a translucent preview before placement.",
-                "The preview includes the support block you are placing and the AutoWire result above it.",
-                AutoWirePreviewOverlay::isVisible,
-                AutoWirePreviewOverlay::setVisible
-        ));
-        options.add(toggle(
-                "Sculk Overlay",
-                "Shows sculk sensor ranges in the world.",
-                "Handles normal and calibrated sensors, including blocks that occlude vibration signals.",
-                SculkSensorOverlay::isVisible,
-                SculkSensorOverlay::setVisible
-        ));
-        options.add(choice(
-                "Sculk Search Distance",
-                "Controls how far around you the overlay searches for sensors.",
-                List.of(
-                        new OptionValue<>(32, "32 Blocks", "Very light on performance, but only covers nearby sensors."),
-                        new OptionValue<>(64, "64 Blocks", "Good compromise for regular use."),
-                        new OptionValue<>(96, "96 Blocks", "Default: covers larger builds without scanning too much."),
-                        new OptionValue<>(128, "128 Blocks", "More range with higher chunk scanning cost."),
-                        new OptionValue<>(192, "192 Blocks", "For large tests only; this can become noticeably heavier.")
-                ),
-                RedstoneUtilsConfig::getSculkSensorSearchDistance,
-                value -> {
-                    RedstoneUtilsConfig.setSculkSensorSearchDistance(value);
-                    SculkSensorOverlay.requestRefresh();
-                }
-        ));
-        options.add(choice(
-                "Sculk Update Interval",
-                "Controls how often the sculk overlay geometry is rebuilt.",
-                List.of(
-                        new OptionValue<>(1, "1 Tick", "Very responsive, but the most expensive option."),
-                        new OptionValue<>(5, "5 Ticks", "Default: responsive enough without rebuilding constantly."),
-                        new OptionValue<>(10, "10 Ticks", "Lighter for large sensor fields."),
-                        new OptionValue<>(20, "20 Ticks", "Once per second; useful for mostly static analysis.")
-                ),
-                RedstoneUtilsConfig::getSculkRebuildIntervalTicks,
-                value -> {
-                    RedstoneUtilsConfig.setSculkRebuildIntervalTicks(value);
-                    SculkSensorOverlay.requestRefresh();
-                }
-        ));
-        options.add(choice(
-                "Teleport Range",
-                "Maximum raycast distance for the teleport keybind.",
-                List.of(
-                        new OptionValue<>(25.0D, "25 Blocks", "Precise short jumps."),
-                        new OptionValue<>(50.0D, "50 Blocks", "Short build and debug distances."),
-                        new OptionValue<>(100.0D, "100 Blocks", "Default range."),
-                        new OptionValue<>(200.0D, "200 Blocks", "Longer jumps for large test worlds."),
-                        new OptionValue<>(500.0D, "500 Blocks", "Very long range; uses a /tp command on multiplayer servers.")
-                ),
-                RedstoneUtilsConfig::getTeleportMaxRange,
-                RedstoneUtilsConfig::setTeleportMaxRange
-        ));
-        options.add(choice(
-                "Feedback Output",
-                "Controls where RedstoneUtils feedback messages are shown.",
-                Arrays.stream(RedstoneMessages.MessageTarget.values())
-                        .map(target -> new OptionValue<>(target, messageTargetName(target), messageTargetDescription(target)))
-                        .toList(),
-                RedstoneMessages::getDefaultTarget,
-                RedstoneMessages::setDefaultTarget
-        ));
-
-        return options;
-    }
-
-    private static List<HelpEntry> createHelpEntries() {
-        return List.of(
-                help("Open Config", "/redstone_utils config", "Opens this screen. Use the Settings tab for global mod options and the Help tab for this overview."),
-                help("Macros", "/redstone_utils macros", "Opens the macro editor. It can bind commands to keys or shorten commands into custom aliases."),
-                help("Wire Preview Overlay", "/overlay wire [true|false]", "Toggles the translucent AutoWire preview. With true or false, the state is set directly."),
-                help("Sculk Overlay", "/overlay sculk [true|false]", "Shows or hides calculated sculk sensor ranges. Search distance and update rate are configured in Settings."),
-                help("All Overlays", "/overlay all [true|false]", "Toggles the HUD layer, wire preview, and sculk overlay together. /overlay without a subcommand also toggles all overlays."),
-                help("Calculator", "/calc", "Opens the ingame calculator. It supports basic operators, parentheses, percent, powers, sqrt, and ans for the last result."),
-                help("Signal Barrel", "/signal <0-15>", "Gives you a barrel that outputs the selected comparator signal strength."),
-                help("Optimal Signal Block Item", "/signal <0-15> optimal", "Gives a compact block item for the selected comparator signal, such as a composter, cake, lectern, or respawn anchor."),
-                help("Specific Signal Block", "/signal <0-15> block <type>", "Creates a specific signal block. Supported examples include barrel, chest, shulker_box, hopper, lectern, crafter, composter, cake, beehive, and cauldron."),
-                help("Set Container Content", "/set-content <amount>", "Sets the targeted container with a setblock command so it contains the requested amount of the item in your main hand."),
-                help("Set Container Signal", "/set-signal <0-15>", "Fills the targeted container so a comparator reads the requested signal strength. Uses the item in your main hand."),
-                help("Teleport Keybind", "Keybind: Teleport to targeted block", "Teleports you to the block you are looking at, or forward to the maximum configured range."),
-                help("Wire Menu Keybind", "Keybind: Open wire menu", "Opens the radial wire menu. Releasing the key activates the currently selected AutoWire mode."),
-                help("AutoWire Modes", "None, Normal, Auto, Fast Auto, Only Repeaters, Only Comparators, Fast Comparators", "Controls what is automatically placed above each support block. The Settings tab explains the currently selected mode."),
-                help("Feedback Output", "Config: Feedback Output", "Controls whether RedstoneUtils feedback appears as a popup, chat message, action bar message, or a combination.")
-        );
-    }
-
-    private static HelpEntry help(String title, String usage, String description) {
-        return new HelpEntry(title, usage, description);
-    }
-
-    private static ConfigOption toggle(String title, String description, String valueDescription, Supplier<Boolean> getter, Consumer<Boolean> setter) {
-        return new ConfigOption(
-                title,
-                description,
-                () -> getter.get() ? "On" : "Off",
-                () -> valueDescription,
-                () -> setter.accept(!getter.get())
-        );
-    }
-
-    private static <T> ConfigOption choice(String title, String description, List<OptionValue<T>> values, Supplier<T> getter, Consumer<T> setter) {
-        return new ConfigOption(
-                title,
-                description,
-                () -> labelFor(values, getter.get()),
-                () -> descriptionFor(values, getter.get()),
-                () -> cycle(values, getter, setter)
-        );
-    }
-
-    private static <T> void cycle(List<OptionValue<T>> values, Supplier<T> getter, Consumer<T> setter) {
-        if (values.isEmpty()) return;
-
-        T current = getter.get();
-        int currentIndex = 0;
-        for (int index = 0; index < values.size(); index++) {
-            if (values.get(index).value().equals(current)) {
-                currentIndex = index;
-                break;
-            }
-        }
-
-        int nextIndex = (currentIndex + 1) % values.size();
-        setter.accept(values.get(nextIndex).value());
-    }
-
-    private static <T> String labelFor(List<OptionValue<T>> values, T value) {
-        for (OptionValue<T> option : values) {
-            if (option.value().equals(value)) return option.label();
-        }
-
-        return values.isEmpty() ? "" : values.getFirst().label();
-    }
-
-    private static <T> String descriptionFor(List<OptionValue<T>> values, T value) {
-        for (OptionValue<T> option : values) {
-            if (option.value().equals(value)) return option.description();
-        }
-
-        return values.isEmpty() ? "" : values.getFirst().description();
-    }
-
-    private static String wireTypeDescription(WireType wireType) {
-        return switch (wireType) {
-            case NONE -> "AutoWire is disabled and does not change your placements.";
-            case NORMAL -> "Places redstone dust on top of every newly placed support block.";
-            case AUTO -> "Places dust and inserts repeaters when the signal can no longer safely continue.";
-            case FAST_AUTO -> "Builds fast booster steps with a block, repeater, and redstone when the signal is nearly depleted.";
-            case ONLY_REPEATERS -> "Places a repeater on every support block in the travel direction.";
-            case ONLY_COMPARATORS -> "Places a comparator on every support block in the travel direction.";
-            case FAST_COMPARATORS -> "Repeatedly builds block, comparator, block, and redstone steps for fast comparator chains.";
-        };
-    }
-
-    private static String messageTargetName(RedstoneMessages.MessageTarget target) {
-        return switch (target) {
-            case POPUP -> "Popup";
-            case CHAT -> "Chat";
-            case ACTION_BAR -> "Action Bar";
-            case POPUP_AND_CHAT -> "Popup + Chat";
-            case POPUP_AND_ACTION_BAR -> "Popup + Action";
-        };
-    }
-
-    private static String messageTargetDescription(RedstoneMessages.MessageTarget target) {
-        return switch (target) {
-            case POPUP -> "Small RedstoneUtils popup in the top-left corner.";
-            case CHAT -> "Writes feedback messages to chat.";
-            case ACTION_BAR -> "Shows feedback above the hotbar.";
-            case POPUP_AND_CHAT -> "Shows a popup and also writes to chat.";
-            case POPUP_AND_ACTION_BAR -> "Shows a popup and an action bar message at the same time.";
-        };
-    }
-
-    private record ConfigOption(String title, String description, Supplier<String> valueLabel,
-                                Supplier<String> valueDescription, Runnable next) {
-    }
-
-    private record HelpEntry(String title, String usage, String description) {
-    }
-
-    private record OptionValue<T>(T value, String label, String description) {
-    }
-
-    private enum Tab {
-        SETTINGS,
-        HELP
-    }
-
-    private record Layout(int x, int y, int width, int height, int contentY, int contentHeight,
-                          int controlX, int footerButtonY) {
-        private int tabY() {
-            return y + 42;
-        }
-
-        private int settingsTabX() {
-            return x + PANEL_PADDING;
-        }
-
-        private int helpTabX() {
-            return settingsTabX() + TAB_WIDTH + GAP;
-        }
-
-        private int contentLeft() {
-            return x + PANEL_PADDING;
-        }
-
-        private int contentRight() {
-            return scrollbarX() - SCROLLBAR_GAP;
-        }
-
-        private int contentWidth() {
-            return contentRight() - contentLeft();
-        }
-
-        private int scrollbarX() {
-            return x + width - PANEL_PADDING - SCROLLBAR_WIDTH;
-        }
-
-        private int resetX() {
-            return x + PANEL_PADDING;
-        }
-
-        private int doneX() {
-            return x + width - PANEL_PADDING - CONTROL_RIGHT_INSET - BUTTON_WIDTH;
-        }
+    private record Layout(int x, int y, int width, int height) {
+        int contentLeft() { return x + 14; }
+        int contentRight() { return x + width - 21; }
+        int contentTop() { return y + HEADER; }
+        int contentBottom() { return y + height - FOOTER; }
+        int contentWidth() { return contentRight() - contentLeft(); }
+        int contentHeight() { return contentBottom() - contentTop(); }
+        int valueX() { return contentRight() - RESET_WIDTH - 6 - VALUE_WIDTH; }
+        int resetX() { return contentRight() - RESET_WIDTH; }
     }
 }

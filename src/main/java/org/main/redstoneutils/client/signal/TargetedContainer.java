@@ -28,24 +28,24 @@ record TargetedContainer(
         Minecraft client = Minecraft.getInstance();
         LocalPlayer player = client.player;
         if (player == null || client.level == null) {
-            source.sendFeedback(Component.literal("No active player"));
+            source.sendFeedback(Component.translatable("message.redstoneutils.no_player"));
             return Optional.empty();
         }
         if (!(client.hitResult instanceof BlockHitResult blockHitResult) || blockHitResult.getType() != HitResult.Type.BLOCK) {
-            source.sendFeedback(Component.literal("Look at a container block first"));
+            source.sendFeedback(Component.translatable("message.redstoneutils.look_at_container"));
             return Optional.empty();
         }
 
         ItemStack heldStack = player.getItemInHand(InteractionHand.MAIN_HAND);
         if (requiresHeldItem && heldStack.isEmpty()) {
-            source.sendFeedback(Component.literal("Hold the item you want to set in your main hand"));
+            source.sendFeedback(Component.translatable("message.redstoneutils.hold_item"));
             return Optional.empty();
         }
 
         BlockPos blockPos = blockHitResult.getBlockPos();
         BlockState blockState = client.level.getBlockState(blockPos);
         if (!(client.level.getBlockEntity(blockPos) instanceof Container container)) {
-            source.sendFeedback(Component.literal("Target block has no item container"));
+            source.sendFeedback(Component.translatable("message.redstoneutils.not_container"));
             return Optional.empty();
         }
 

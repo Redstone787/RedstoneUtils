@@ -1,6 +1,7 @@
 package org.main.redstoneutils.client.macro;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
 import org.main.redstoneutils.client.ui.RedstoneMessages;
 
 public final class MacroExecutor {
@@ -9,7 +10,7 @@ public final class MacroExecutor {
     }
 
     public static boolean execute(Macro macro) {
-        if (macro == null || macro.command().isBlank()) return false;
+        if (macro == null || !macro.enabled() || macro.command().isBlank()) return false;
         return executeCommand(macro.command());
     }
 
@@ -29,7 +30,7 @@ public final class MacroExecutor {
 
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.getConnection() == null) {
-            RedstoneMessages.send("Cannot run macro without an active connection");
+            RedstoneMessages.send(Component.translatable("message.redstoneutils.macro.no_connection"));
             return false;
         }
 

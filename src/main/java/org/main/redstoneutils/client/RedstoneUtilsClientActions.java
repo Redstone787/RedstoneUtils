@@ -1,11 +1,14 @@
 package org.main.redstoneutils.client;
 
+import net.minecraft.network.chat.Component;
 import org.main.redstoneutils.client.autowire.AutoWirePreviewOverlay;
+import org.main.redstoneutils.client.bud.BudSwitchOverlay;
 import org.main.redstoneutils.client.config.ConfigScreen;
 import org.main.redstoneutils.client.macro.MacrosScreen;
 import org.main.redstoneutils.client.sculk.SculkSensorOverlay;
 import org.main.redstoneutils.client.ui.RedstoneMessages;
 import org.main.redstoneutils.client.ui.RedstoneOverlay;
+import org.main.redstoneutils.client.ui.ToolboxScreen;
 
 public final class RedstoneUtilsClientActions {
 
@@ -13,7 +16,9 @@ public final class RedstoneUtilsClientActions {
     public static final String MACROS = "macros";
     public static final String WIRE_OVERLAY = "wire_overlay";
     public static final String SCULK_OVERLAY = "sculk_overlay";
+    public static final String BUD_OVERLAY = "bud_overlay";
     public static final String ALL_OVERLAYS = "all_overlays";
+    public static final String TOOLBOX = "toolbox";
 
     private RedstoneUtilsClientActions() {
     }
@@ -24,7 +29,9 @@ public final class RedstoneUtilsClientActions {
             case MACROS -> openMacros();
             case WIRE_OVERLAY -> setWireOverlay(valueToBoolean(value, !AutoWirePreviewOverlay.isVisible()));
             case SCULK_OVERLAY -> setSculkOverlay(valueToBoolean(value, !SculkSensorOverlay.isVisible()));
+            case BUD_OVERLAY -> setBudOverlay(valueToBoolean(value, !BudSwitchOverlay.isVisible()));
             case ALL_OVERLAYS -> setAllOverlays(valueToBoolean(value, !allOverlaysVisible()));
+            case TOOLBOX -> ToolboxScreen.open();
             default -> {
             }
         }
@@ -32,7 +39,7 @@ public final class RedstoneUtilsClientActions {
 
     public static void setWireOverlay(boolean visible) {
         AutoWirePreviewOverlay.setVisible(visible);
-        RedstoneMessages.popup("Wire overlay: " + stateName(visible));
+        overlayMessage("wire", visible);
     }
 
     public static boolean wireOverlayVisible() {
@@ -41,22 +48,35 @@ public final class RedstoneUtilsClientActions {
 
     public static void setSculkOverlay(boolean visible) {
         SculkSensorOverlay.setVisible(visible);
-        RedstoneMessages.popup("Sculk overlay: " + stateName(visible));
+        overlayMessage("sculk", visible);
     }
 
     public static boolean sculkOverlayVisible() {
         return SculkSensorOverlay.isVisible();
     }
 
+    public static void setBudOverlay(boolean visible) {
+        BudSwitchOverlay.setVisible(visible);
+        overlayMessage("bud", visible);
+    }
+
+    public static boolean budOverlayVisible() {
+        return BudSwitchOverlay.isVisible();
+    }
+
     public static void setAllOverlays(boolean visible) {
         RedstoneOverlay.setVisible(visible);
         AutoWirePreviewOverlay.setVisible(visible);
+        BudSwitchOverlay.setVisible(visible);
         SculkSensorOverlay.setVisible(visible);
-        RedstoneMessages.popup("All overlays: " + stateName(visible));
+        overlayMessage("all", visible);
     }
 
     public static boolean allOverlaysVisible() {
-        return AutoWirePreviewOverlay.isVisible() && RedstoneOverlay.isVisible() && SculkSensorOverlay.isVisible();
+        return AutoWirePreviewOverlay.isVisible()
+                && BudSwitchOverlay.isVisible()
+                && RedstoneOverlay.isVisible()
+                && SculkSensorOverlay.isVisible();
     }
 
     public static void openConfig() {
@@ -73,7 +93,10 @@ public final class RedstoneUtilsClientActions {
         return toggleValue;
     }
 
-    private static String stateName(boolean visible) {
-        return visible ? "on" : "off";
+    private static void overlayMessage(String overlay, boolean visible) {
+        RedstoneMessages.popup(Component.translatable(
+                "message.redstoneutils.overlay." + overlay,
+                Component.translatable(visible ? "state.redstoneutils.on" : "state.redstoneutils.off")
+        ));
     }
 }

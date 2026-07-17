@@ -1,5 +1,6 @@
 package org.main.redstoneutils.client.signal;
 
+import net.minecraft.network.chat.Component;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.Map;
@@ -259,7 +260,7 @@ enum SignalBlockVariant {
     }
 
     String displayName() {
-        return displayName;
+        return Component.translatable("signal_block.redstoneutils." + key).getString();
     }
 
     boolean targetBlock() {
@@ -275,7 +276,7 @@ enum SignalBlockVariant {
     }
 
     String unsupportedStrengthMessage() {
-        return displayName + " supports signal strengths " + supportedStrengths;
+        return Component.translatable("message.redstoneutils.signal.supported_strengths", displayName(), supportedStrengths).getString();
     }
 
     private java.util.stream.Stream<String> names() {

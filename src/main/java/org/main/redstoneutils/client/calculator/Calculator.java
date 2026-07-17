@@ -16,7 +16,7 @@ public final class Calculator {
         });
     }
 
-    private static int openCalculator() {
+    public static int openCalculator() {
         Minecraft minecraft = Minecraft.getInstance();
         minecraft.execute(() -> minecraft.gui.setScreen(new CalculatorScreen()));
         return 1;

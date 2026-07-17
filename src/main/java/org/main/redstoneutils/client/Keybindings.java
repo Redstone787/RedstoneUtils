@@ -16,6 +16,7 @@ import org.main.redstoneutils.client.autowire.WireType;
 import org.main.redstoneutils.client.teleport.TpUtil;
 import org.main.redstoneutils.client.ui.CircleSegment;
 import org.main.redstoneutils.client.ui.RedstoneOverlay;
+import org.main.redstoneutils.client.ui.ToolboxScreen;
 
 import java.util.HashMap;
 import java.util.List;
@@ -31,6 +32,7 @@ public final class Keybindings {
 
     public static void init() {
         register(generateKey("key.redstoneutils.teleport"), TpUtil::teleportToBlock);
+        register(generateKey("key.redstoneutils.toolbox"), ToolboxScreen::open);
         wireMenuKey = generateKey("key.redstoneutils.wire");
 
         keyBindingExe();

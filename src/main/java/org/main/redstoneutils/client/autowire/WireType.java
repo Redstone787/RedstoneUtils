@@ -1,6 +1,7 @@
 package org.main.redstoneutils.client.autowire;
 
 import net.minecraft.resources.Identifier;
+import net.minecraft.network.chat.Component;
 import org.main.redstoneutils.RedstoneUtils;
 
 public enum WireType {
@@ -27,7 +28,7 @@ public enum WireType {
     }
 
     public String getDisplayName() {
-        return displayName;
+        return Component.translatable("wire_type.redstoneutils." + name().toLowerCase(java.util.Locale.ROOT)).getString();
     }
 
     public Identifier getTextureIdentifier() {

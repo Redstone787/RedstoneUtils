@@ -50,7 +50,21 @@ public class AutoWireHandler {
         RedstoneUtilsConfig.setActiveWireType(activeWireType);
         AutoWire.reset();
         RedstoneUtilsClientNetworking.setServerAutoWire(activeWireType);
-        RedstoneMessages.popup("Active Wire: " + activeWireType.getDisplayName());
+        RedstoneMessages.popup(net.minecraft.network.chat.Component.translatable(
+                "message.redstoneutils.autowire.active",
+                activeWireType.getDisplayName()
+        ));
+    }
+
+    /** Replays the persisted/profiled mode after the play connection becomes writable. */
+    public static void syncServerMode() {
+        RedstoneUtilsClientNetworking.setServerAutoWire(activeWireType);
+    }
+
+    public static void reloadFromProfile() {
+        activeWireType = RedstoneUtilsConfig.getActiveWireType();
+        AutoWire.reset();
+        syncServerMode();
     }
 
     public static List<WireType> getSelectableWireTypes() {

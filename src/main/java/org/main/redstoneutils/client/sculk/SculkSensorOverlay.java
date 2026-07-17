@@ -31,6 +31,7 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import org.main.redstoneutils.client.config.RedstoneUtilsConfig;
+import org.main.redstoneutils.client.overlay.OverlayFreeze;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -48,11 +49,6 @@ public final class SculkSensorOverlay {
     private static final double SENSOR_BOX_INFLATE = 0.004D;
     private static final double OCCLUSION_RAY_OFFSET = 9.999999747378752E-6D;
     private static final Direction[] DIRECTIONS = Direction.values();
-    private static final GizmoStyle SENSOR_STYLE = GizmoStyle.strokeAndFill(
-            SENSOR_STROKE_COLOR,
-            STROKE_WIDTH,
-            SENSOR_FILL_COLOR
-    );
 
     private static SculkRenderData renderData = null;
     private static boolean visible = RedstoneUtilsConfig.isSculkOverlayVisible();
@@ -80,6 +76,7 @@ public final class SculkSensorOverlay {
         if (!visible) {
             renderData = null;
         }
+        if (OverlayFreeze.sculkFrozen() && renderData != null) return;
         nextRebuildGameTime = 0L;
     }
 
@@ -134,7 +131,7 @@ public final class SculkSensorOverlay {
     }
 
     private static List<SculkSensor> findSensors(ClientLevel level, BlockPos playerPos) {
-        int maxSensorDistance = RedstoneUtilsConfig.getSculkSensorSearchDistance();
+        int maxSensorDistance = Math.min(RedstoneUtilsConfig.getSculkSensorSearchDistance(), RedstoneUtilsConfig.getOverlayMaxDistance());
         int minChunkX = (playerPos.getX() - maxSensorDistance) >> 4;
         int maxChunkX = (playerPos.getX() + maxSensorDistance) >> 4;
         int minChunkZ = (playerPos.getZ() - maxSensorDistance) >> 4;
@@ -316,19 +313,29 @@ public final class SculkSensorOverlay {
         }
 
         DrawableGizmoPrimitives primitives = new DrawableGizmoPrimitives();
+        int baseColor = RedstoneUtilsConfig.sculkColor();
+        int fillColor = color(baseColor, 0.18F);
+        int strokeColor = color(baseColor, 0.78F);
+        float lineWidth = RedstoneUtilsConfig.getOverlayLineWidth();
+        GizmoStyle sensorStyle = GizmoStyle.strokeAndFill(strokeColor, lineWidth, color(baseColor, 0.30F));
         for (SensorRangeMesh mesh : data.meshes()) {
             for (QuadFace face : mesh.faces()) {
-                primitives.addQuad(face.a(), face.b(), face.c(), face.d(), FILL_COLOR);
+                primitives.addQuad(face.a(), face.b(), face.c(), face.d(), fillColor);
             }
             for (LineSegment line : mesh.lines()) {
-                primitives.addLine(line.from(), line.to(), STROKE_COLOR, STROKE_WIDTH);
+                primitives.addLine(line.from(), line.to(), strokeColor, lineWidth);
             }
 
-            new CuboidGizmo(new AABB(mesh.sensorPos()).inflate(SENSOR_BOX_INFLATE), SENSOR_STYLE, false)
+            new CuboidGizmo(new AABB(mesh.sensorPos()).inflate(SENSOR_BOX_INFLATE), sensorStyle, false)
                     .emit(primitives, 1.0F);
         }
 
-        primitives.submit(context.submitNodeCollector(), context.levelState().cameraRenderState, false);
+        primitives.submit(context.submitNodeCollector(), context.levelState().cameraRenderState, RedstoneUtilsConfig.renderOverlaysThroughWalls());
+    }
+
+    private static int color(int color, float alphaMultiplier) {
+        int alpha = Math.clamp(Math.round((color >>> 24) * RedstoneUtilsConfig.getOverlayOpacity() * alphaMultiplier), 0, 255);
+        return color & 0x00FFFFFF | alpha << 24;
     }
 
     private record SculkSensor(BlockPos blockPos, int radius) {

@@ -15,6 +15,7 @@ public final class RedstoneUtilsNetworking {
         PayloadTypeRegistry.serverboundPlay().register(SetAutoWirePayload.TYPE, SetAutoWirePayload.CODEC);
         PayloadTypeRegistry.serverboundPlay().register(TeleportPayload.TYPE, TeleportPayload.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(ClientCommandPayload.TYPE, ClientCommandPayload.CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(AutoWireFeedbackPayload.TYPE, AutoWireFeedbackPayload.CODEC);
     }
 
     public record SetAutoWirePayload(String mode) implements CustomPacketPayload {
@@ -73,6 +74,28 @@ public final class RedstoneUtilsNetworking {
         private void write(RegistryFriendlyByteBuf buf) {
             buf.writeUtf(action, 64);
             buf.writeVarInt(value);
+        }
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record AutoWireFeedbackPayload(String reason, String componentTranslationKey) implements CustomPacketPayload {
+        public static final Type<AutoWireFeedbackPayload> TYPE = new Type<>(RedstoneUtils.id("autowire_feedback"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, AutoWireFeedbackPayload> CODEC = StreamCodec.ofMember(
+                AutoWireFeedbackPayload::write,
+                AutoWireFeedbackPayload::read
+        );
+
+        private static AutoWireFeedbackPayload read(RegistryFriendlyByteBuf buf) {
+            return new AutoWireFeedbackPayload(buf.readUtf(64), buf.readUtf(128));
+        }
+
+        private void write(RegistryFriendlyByteBuf buf) {
+            buf.writeUtf(reason, 64);
+            buf.writeUtf(componentTranslationKey, 128);
         }
 
         @Override

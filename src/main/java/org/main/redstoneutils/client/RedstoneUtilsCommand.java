@@ -35,6 +35,10 @@ public class RedstoneUtilsCommand {
                             .executes(context -> setSculkOverlay(context, !RedstoneUtilsClientActions.sculkOverlayVisible()))
                             .then(ClientCommands.argument(ARG_VISIBLE, BoolArgumentType.bool())
                                     .executes(context -> setSculkOverlay(context, BoolArgumentType.getBool(context, ARG_VISIBLE)))))
+                    .then(ClientCommands.literal("bud")
+                            .executes(context -> setBudOverlay(context, !RedstoneUtilsClientActions.budOverlayVisible()))
+                            .then(ClientCommands.argument(ARG_VISIBLE, BoolArgumentType.bool())
+                                    .executes(context -> setBudOverlay(context, BoolArgumentType.getBool(context, ARG_VISIBLE)))))
                     .then(ClientCommands.literal("all")
                             .executes(context -> setAllOverlays(context, !allOverlaysVisible()))
                             .then(ClientCommands.argument(ARG_VISIBLE, BoolArgumentType.bool())
@@ -44,6 +48,11 @@ public class RedstoneUtilsCommand {
             dispatcher.register(ClientCommands.literal("redstone_utils")
                     .then(ClientCommands.literal("config")
                             .executes(RedstoneUtilsCommand::openConfig))
+                    .then(ClientCommands.literal("toolbox")
+                            .executes(context -> {
+                                org.main.redstoneutils.client.ui.ToolboxScreen.open();
+                                return 1;
+                            }))
                     .then(ClientCommands.literal("macros")
                             .executes(RedstoneUtilsCommand::openMacros))
                     .then(ClientCommands.literal("autowire")
@@ -63,17 +72,22 @@ public class RedstoneUtilsCommand {
 
     private static int setWireOverlay(CommandContext<FabricClientCommandSource> context, boolean visible) {
         RedstoneUtilsClientActions.setWireOverlay(visible);
-        return feedback(context, "Wire overlay: " + stateName(visible));
+        return overlayFeedback(context, "wire", visible);
     }
 
     private static int setSculkOverlay(CommandContext<FabricClientCommandSource> context, boolean visible) {
         RedstoneUtilsClientActions.setSculkOverlay(visible);
-        return feedback(context, "Sculk overlay: " + stateName(visible));
+        return overlayFeedback(context, "sculk", visible);
+    }
+
+    private static int setBudOverlay(CommandContext<FabricClientCommandSource> context, boolean visible) {
+        RedstoneUtilsClientActions.setBudOverlay(visible);
+        return overlayFeedback(context, "bud", visible);
     }
 
     private static int setAllOverlays(CommandContext<FabricClientCommandSource> context, boolean visible) {
         RedstoneUtilsClientActions.setAllOverlays(visible);
-        return feedback(context, "All overlays: " + stateName(visible));
+        return overlayFeedback(context, "all", visible);
     }
 
     private static boolean allOverlaysVisible() {
@@ -85,25 +99,37 @@ public class RedstoneUtilsCommand {
         return 1;
     }
 
+    private static int feedback(CommandContext<FabricClientCommandSource> context, Component message) {
+        context.getSource().sendFeedback(message);
+        return 1;
+    }
+
+    private static int overlayFeedback(CommandContext<FabricClientCommandSource> context, String overlay, boolean visible) {
+        return feedback(context, Component.translatable(
+                "message.redstoneutils.overlay." + overlay,
+                Component.translatable(visible ? "state.redstoneutils.on" : "state.redstoneutils.off")
+        ));
+    }
+
     private static int openConfig(CommandContext<FabricClientCommandSource> context) {
         RedstoneUtilsClientActions.openConfig();
-        return feedback(context, "Opened RedstoneUtils config");
+        return feedback(context, Component.translatable("message.redstoneutils.opened_config"));
     }
 
     private static int openMacros(CommandContext<FabricClientCommandSource> context) {
         RedstoneUtilsClientActions.openMacros();
-        return feedback(context, "Opened RedstoneUtils macros");
+        return feedback(context, Component.translatable("message.redstoneutils.opened_macros"));
     }
 
     private static int showAutoWire(CommandContext<FabricClientCommandSource> context) {
-        return feedback(context, "AutoWire: " + AutoWireHandler.getActiveWireType().getDisplayName());
+        return feedback(context, Component.translatable("message.redstoneutils.autowire.active", AutoWireHandler.getActiveWireType().getDisplayName()));
     }
 
     private static int setAutoWire(CommandContext<FabricClientCommandSource> context) {
         String mode = StringArgumentType.getString(context, ARG_MODE);
         WireType wireType = findWireType(mode);
         if (wireType == null) {
-            return feedback(context, "Unknown AutoWire mode. Supported: " + wireTypeSuggestions());
+            return feedback(context, Component.translatable("message.redstoneutils.autowire.unknown", wireTypeSuggestions()));
         }
 
         AutoWireHandler.setActiveWireType(wireType);
@@ -126,7 +152,7 @@ public class RedstoneUtilsCommand {
             return 1;
         }
 
-        return feedback(context, "Server-side RedstoneUtils teleport is not available");
+        return feedback(context, Component.translatable("message.redstoneutils.teleport.backend_missing"));
     }
 
     private static CompletableFuture<Suggestions> suggestWireTypes(CommandContext<FabricClientCommandSource> context, SuggestionsBuilder builder) {
@@ -153,7 +179,4 @@ public class RedstoneUtilsCommand {
         return suggestions.toString();
     }
 
-    private static String stateName(boolean visible) {
-        return visible ? "on" : "off";
-    }
 }
