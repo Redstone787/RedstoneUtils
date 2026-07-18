@@ -9,7 +9,15 @@ import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommands;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
+import net.minecraft.client.Minecraft;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.item.DyeColor;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.ColorCollection;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
 import org.main.redstoneutils.client.autowire.AutoWireHandler;
 import org.main.redstoneutils.client.autowire.WireType;
 import org.main.redstoneutils.client.teleport.TpUtil;
@@ -44,6 +52,9 @@ public class RedstoneUtilsCommand {
                             .then(ClientCommands.argument(ARG_VISIBLE, BoolArgumentType.bool())
                                     .executes(context -> setAllOverlays(context, BoolArgumentType.getBool(context, ARG_VISIBLE)))))
             );
+
+            dispatcher.register(ClientCommands.literal("color")
+                    .executes(RedstoneUtilsCommand::colorCommand));
 
             dispatcher.register(ClientCommands.literal("redstone_utils")
                     .then(ClientCommands.literal("config")
@@ -177,6 +188,56 @@ public class RedstoneUtilsCommand {
             suggestions.append(wireType.name().toLowerCase(Locale.ROOT));
         }
         return suggestions.toString();
+    }
+
+    private static int colorCommand(CommandContext<FabricClientCommandSource> context) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player == null || minecraft.level == null) {
+            context.getSource().sendFeedback(Component.translatable("message.redstoneutils.no_player"));
+            return 0;
+        }
+
+        if (!(minecraft.hitResult instanceof BlockHitResult hitResult)
+                || hitResult.getType() != HitResult.Type.BLOCK) {
+            context.getSource().sendFeedback(Component.translatable("message.redstoneutils.look_at_block"));
+            return 0;
+        }
+
+        Block hitBlock = minecraft.level.getBlockState(hitResult.getBlockPos()).getBlock();
+        DyeColor color = findColor(hitBlock, Blocks.STAINED_GLASS);
+        Block targetBlock;
+
+        if (color != null) {
+            targetBlock = Blocks.WOOL.pick(color);
+        } else {
+            color = findColor(hitBlock, Blocks.WOOL);
+            if (color == null) color = findColor(hitBlock, Blocks.CONCRETE);
+            if (color == null) color = findColor(hitBlock, Blocks.DYED_TERRACOTTA);
+
+            if (color == null) {
+                context.getSource().sendFeedback(Component.translatable("message.redstoneutils.color.unsupported"));
+                return 0;
+            }
+
+            targetBlock = Blocks.STAINED_GLASS.pick(color);
+        }
+
+        if (minecraft.getConnection() == null) {
+            context.getSource().sendFeedback(Component.translatable("message.redstoneutils.color.no_connection"));
+            return 0;
+        }
+
+        minecraft.getConnection().sendCommand(
+                "give @s " + BuiltInRegistries.BLOCK.getKey(targetBlock)
+        );
+        return feedback(context, Component.translatable("message.redstoneutils.color.sent", targetBlock.getName()));
+    }
+
+    private static DyeColor findColor(Block block, ColorCollection<Block> blocks) {
+        for (DyeColor color : DyeColor.values()) {
+            if (blocks.pick(color) == block) return color;
+        }
+        return null;
     }
 
 }

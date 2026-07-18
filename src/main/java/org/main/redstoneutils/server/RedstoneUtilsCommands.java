@@ -31,6 +31,7 @@ import org.main.redstoneutils.server.autowire.WireType;
 import org.main.redstoneutils.server.clock.ClockInterval;
 import org.main.redstoneutils.server.clock.ClockManager;
 import org.main.redstoneutils.server.clock.ComparatorClockManager;
+import org.main.redstoneutils.server.clock.HopperClockInterval;
 import org.main.redstoneutils.server.clock.HopperClockManager;
 import org.main.redstoneutils.server.config.RedstoneUtilsServerConfig;
 import org.main.redstoneutils.server.config.RedstoneUtilsServerConfig.Tool;
@@ -379,12 +380,12 @@ public final class RedstoneUtilsCommands {
     }
 
     private static int createHopperClock(CommandSourceStack source, String intervalValue) throws CommandSyntaxException {
-        ClockInterval.ParseResult parsed = ClockInterval.parseHopper(intervalValue);
+        HopperClockInterval.ParseResult parsed = HopperClockInterval.parse(intervalValue);
         if (!parsed.successful()) {
             source.sendFailure(parsed.error());
             return 0;
         }
-        if (parsed.interval().ticks() > RedstoneUtilsServerConfig.maxHopperClockTicks()) {
+        if (parsed.interval().exceedsRedstoneTickLimit(RedstoneUtilsServerConfig.maxHopperClockTicks())) {
             source.sendFailure(Component.translatable(
                     "message.redstoneutils.clock.server_limit",
                     RedstoneUtilsServerConfig.maxHopperClockTicks()

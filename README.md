@@ -10,7 +10,7 @@ Redstone Utils is a Fabric mod for Minecraft 26.2 with client-side workflow tool
 | --- | --- |
 | Mod ID | `redstoneutils` |
 | Display Name | Redstone Utils |
-| Version | `1.1.1` |
+| Version | `1.2.0` |
 | Minecraft | `26.2` |
 | Fabric Loader | `>=0.19.3` |
 | Fabric API | `0.154.2+26.2` |
@@ -19,6 +19,16 @@ Redstone Utils is a Fabric mod for Minecraft 26.2 with client-side workflow tool
 | License | All rights reserved |
 
 ## Features
+
+### Waterproof Redstone Gamerule
+
+```mcfunction
+/gamerule redstoneutils:waterproof_redstone true
+```
+
+The `redstoneutils:waterproof_redstone` gamerule prevents water from replacing Redstone components. It covers flowing water as well as water placed with buckets by players or dispensers. Protected components include redstone dust, torches, repeaters, comparators, levers, tripwire and hooks, buttons, pressure plates, powered rails, detector rails, and activator rails.
+
+The rule defaults to `false` to preserve vanilla behavior. Set it back to `false` to make water wash away components normally. Modpacks can extend the protected set through the `redstoneutils:waterproof_redstone_components` block tag.
 
 ### AutoWire
 
@@ -90,7 +100,7 @@ x P> R  .  <P x
 
 `H` marks the two hoppers facing into each other, `C` the outward-facing comparators, `P` the sticky pistons, `R` the initial redstone-block position, `.` its second position, `x` redstone dust, and `B` solid blocks. Counter items are added to the right hopper automatically. The moving redstone block locks one hopper at a time and also provides the alternating clock output.
 
-Hopper intervals are nominal periods from 8 to 2,560 redstone ticks (`0.8s` to `256s`) in 8-tick (`0.8s`) steps. Each step adds one stick to the hoppers, up to their combined capacity of 320 items. The classic Ethonian clock transfers its first item immediately, so its measured period is half a redstone tick (`0.05s`) shorter than the nominal command value: one item measures about `0.75s`, and every additional item adds `0.8s`.
+The exact period of the classic Ethonian clock is `8 × items − 6` redstone ticks for two or more items. Its one-item state is a special case at 7 ticks (`0.7s`); two items produce 10 ticks (`1s`), and every additional item adds 8 ticks (`0.8s`). Exact periods therefore run from 10 to 2,554 ticks (`1s` to `255.4s`) in 8-tick steps, plus the 7-tick special case. Inputs such as `7t`, `10t`, and `7.4s` are supported; periods the circuit cannot represent exactly are rejected instead of rounded. Up to 320 sticks fit in the hopper.
 
 The clock is built at the player's feet and points in the horizontal direction the player is looking. If the player holds a solid full redstone-conducting block that does not emit a signal in the main hand, that block is used for the support platform and the hopper clock's two outer blocks; otherwise the builder uses white wool. Configured repeaters in comparator feedback loops and counter items in hopper clocks provide the requested delay.
 
@@ -127,10 +137,11 @@ The server raycasts from the player and teleports them to the hit location, or f
 - Macro manager with search, categories, sorting, duplication, enable/disable, import/export, and delete confirmation
 - Key and mouse macro combinations with modifiers and pressed, released, or held triggers
 - In-game calculator through `/calc`
+- Color-matching helper through `/color` for wool, concrete, terracotta, and stained glass
 - Teleport keybind
 - Radial AutoWire menu
 - Popup, chat, and action-bar feedback options
-- English and German translations
+- English translation
 
 Overlay visibility is controlled through its own command:
 
@@ -202,7 +213,7 @@ The server creates `config/redstoneutils-server.json` on first start. Changes ta
   "maxTargetRange": 128.0,
   "maxContainerItems": 100000,
   "maxComparatorClockTicks": 600,
-  "maxHopperClockTicks": 2560,
+  "maxHopperClockTicks": 2554,
   "historySize": 20
 }
 ```
@@ -255,12 +266,14 @@ After a successful build, the remapped mod JAR is written to `build/libs/`.
 src/main/java/org/main/redstoneutils/
   Shared initializer and mod ID helpers
   client/                            Client overlays, screens, keybinds, macros, calculator, fallback commands
+  mixin/                             Vanilla hooks for server-side gameplay rules
   network/                           Client-to-server and server-to-client payload definitions
-  server/                            Server commands, networking, config, shared history, and world-editing logic
+  server/                            Server commands, networking, gamerules, config, shared history, and world-editing logic
 
 src/main/resources/
   fabric.mod.json                    Fabric metadata
-  assets/redstoneutils/              Client icon, English/German language files, and overlay textures
+  assets/redstoneutils/              Client icon, English language file, and overlay textures
+  data/redstoneutils/tags/block/     Extensible protected-component block tags
 ```
 
 ## License

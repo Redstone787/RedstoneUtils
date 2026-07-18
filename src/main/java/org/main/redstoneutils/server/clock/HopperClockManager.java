@@ -25,18 +25,18 @@ public final class HopperClockManager {
     private HopperClockManager() {
     }
 
-    public static ClockManager.Result create(ServerPlayer player, ClockInterval interval) {
+    public static ClockManager.Result create(ServerPlayer player, HopperClockInterval interval) {
         ServerLevel level = player.level();
         Direction forward = player.getDirection();
         Direction right = forward.getClockWise();
         BlockPos origin = player.blockPosition();
         BlockState supportState = ClockManager.supportState(player, level, origin.below());
-        int itemCount = interval.ticks() / ClockInterval.HOPPER_TICK_STEP;
+        int itemCount = interval.itemCount();
         ClockManager.BuildPlan plan = createPlan(origin, forward, right, supportState, itemCount);
 
         Component description = Component.translatable(
                 "history.redstoneutils.clock.hopper",
-                interval.ticks(),
+                interval.periodRedstoneTicksText(),
                 itemCount,
                 supportState.getBlock().getName(),
                 Component.translatable("direction.minecraft." + forward.getName())
