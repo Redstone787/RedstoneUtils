@@ -9,3 +9,6 @@ logs/
 
 *.class
 .DS_Store
+
+# Local-only test commands and test logic (never shipped or committed)
+.local-tests/

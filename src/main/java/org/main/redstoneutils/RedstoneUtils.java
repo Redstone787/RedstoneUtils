@@ -7,6 +7,7 @@ import org.main.redstoneutils.server.RedstoneUtilsCommands;
 import org.main.redstoneutils.server.RedstoneUtilsServerNetworking;
 import org.main.redstoneutils.server.autowire.ServerAutoWire;
 import org.main.redstoneutils.server.config.RedstoneUtilsServerConfig;
+import org.main.redstoneutils.server.gamerule.RedstoneUtilsGameRules;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,6 +21,7 @@ public class RedstoneUtils implements ModInitializer {
 
     @Override
     public void onInitialize() {
+        RedstoneUtilsGameRules.init();
         RedstoneUtilsServerConfig.load();
         RedstoneUtilsNetworking.init();
         ServerAutoWire.init();

@@ -125,7 +125,7 @@ public final class RedstoneUtilsServerConfig {
         data.maxTargetRange = Math.clamp(data.maxTargetRange, 4.0D, 1_024.0D);
         data.maxContainerItems = Math.clamp(data.maxContainerItems, 0, 1_000_000);
         data.maxComparatorClockTicks = Math.clamp(data.maxComparatorClockTicks, 2, 600);
-        data.maxHopperClockTicks = Math.clamp(data.maxHopperClockTicks, 8, 2_560);
+        data.maxHopperClockTicks = Math.clamp(data.maxHopperClockTicks, 7, 2_554);
         data.historySize = Math.clamp(data.historySize, 1, 100);
     }
 
@@ -180,7 +180,7 @@ public final class RedstoneUtilsServerConfig {
         private double maxTargetRange = 128.0D;
         private int maxContainerItems = 100_000;
         private int maxComparatorClockTicks = 600;
-        private int maxHopperClockTicks = 2_560;
+        private int maxHopperClockTicks = 2_554;
         private int historySize = 20;
     }
 }

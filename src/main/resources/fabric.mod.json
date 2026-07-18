@@ -19,6 +19,9 @@
       "org.main.redstoneutils.RedstoneUtils"
     ]
   },
+  "mixins": [
+    "redstoneutils.mixins.json"
+  ],
   "depends": {
     "fabricloader": ">=${loader_version}",
     "fabric-api": "*",

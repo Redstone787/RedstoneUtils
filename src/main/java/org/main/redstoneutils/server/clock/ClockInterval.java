@@ -12,10 +12,6 @@ public record ClockInterval(int ticks) {
     public static final int MIN_COMPARATOR_TICKS = 2;
     public static final int COMPARATOR_TICK_STEP = 2;
     public static final int MAX_COMPARATOR_TICKS = 60 * TICKS_PER_SECOND;
-    public static final int MIN_HOPPER_TICKS = 8;
-    public static final int HOPPER_TICK_STEP = 8;
-    public static final int MAX_HOPPER_ITEMS = 5 * 64;
-    public static final int MAX_HOPPER_TICKS = MAX_HOPPER_ITEMS * HOPPER_TICK_STEP;
 
     private static final Pattern INTERVAL_PATTERN = Pattern.compile("([0-9]+(?:\\.[0-9]+)?)([ts]?)");
     private static final BigDecimal TICKS_PER_SECOND_DECIMAL = BigDecimal.valueOf(TICKS_PER_SECOND);
@@ -27,18 +23,6 @@ public record ClockInterval(int ticks) {
         int ticks = parsed.interval().ticks();
         if (ticks < MIN_COMPARATOR_TICKS || ticks % COMPARATOR_TICK_STEP != 0) {
             return ParseResult.failure(Component.translatable("message.redstoneutils.clock.comparator_range"));
-        }
-
-        return parsed;
-    }
-
-    public static ParseResult parseHopper(String value) {
-        ParseResult parsed = parseValue(value, MAX_HOPPER_TICKS);
-        if (!parsed.successful()) return parsed;
-
-        int ticks = parsed.interval().ticks();
-        if (ticks < MIN_HOPPER_TICKS || ticks % HOPPER_TICK_STEP != 0) {
-            return ParseResult.failure(Component.translatable("message.redstoneutils.clock.hopper_range"));
         }
 
         return parsed;
