@@ -24,9 +24,10 @@ Redstone Utils is a Fabric mod for Minecraft 26.2 with client-side workflow tool
 
 ```mcfunction
 /gamerule redstoneutils:waterproof_redstone true
+/redstone_utils waterproof_redstone true
 ```
 
-The `redstoneutils:waterproof_redstone` gamerule prevents water from replacing Redstone components. It covers flowing water as well as water placed with buckets by players or dispensers. Protected components include redstone dust, torches, repeaters, comparators, levers, tripwire and hooks, buttons, pressure plates, powered rails, detector rails, and activator rails.
+The `redstoneutils:waterproof_redstone` gamerule prevents water from replacing Redstone components. The Redstone Utils command is an equivalent shortcut and can be run without a boolean value to query the current state. Both forms require Redstone Utils on the server because gamerules are server-owned. It covers flowing water as well as water placed with buckets by players or dispensers. Protected components include redstone dust, torches, repeaters, comparators, levers, tripwire and hooks, buttons, pressure plates, powered rails, detector rails, and activator rails.
 
 The rule defaults to `false` to preserve vanilla behavior. Set it back to `false` to make water wash away components normally. Modpacks can extend the protected set through the `redstoneutils:waterproof_redstone_components` block tag.
 
