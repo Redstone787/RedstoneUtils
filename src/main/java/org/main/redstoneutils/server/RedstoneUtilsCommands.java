@@ -35,6 +35,7 @@ import org.main.redstoneutils.server.clock.HopperClockInterval;
 import org.main.redstoneutils.server.clock.HopperClockManager;
 import org.main.redstoneutils.server.config.RedstoneUtilsServerConfig;
 import org.main.redstoneutils.server.config.RedstoneUtilsServerConfig.Tool;
+import org.main.redstoneutils.server.gamerule.RedstoneUtilsGameRules;
 import org.main.redstoneutils.server.history.ChangeHistory;
 import org.main.redstoneutils.server.signal.ComparatorSignal;
 import org.main.redstoneutils.server.signal.SignalBlockVariant;
@@ -114,6 +115,14 @@ public final class RedstoneUtilsCommands {
                     .then(Commands.literal("reset_autowire")
                             .requires(RedstoneUtilsCommands::canUseAutoWire)
                             .executes(RedstoneUtilsCommands::resetAutoWire))
+                    .then(Commands.literal("waterproof_redstone")
+                            .requires(RedstoneUtilsCommands::canManageGameRules)
+                            .executes(context -> showWaterproofRedstone(context.getSource()))
+                            .then(Commands.argument("enabled", BoolArgumentType.bool())
+                                    .executes(context -> setWaterproofRedstone(
+                                            context.getSource(),
+                                            BoolArgumentType.getBool(context, "enabled")
+                                    ))))
                     .then(Commands.literal("tp")
                             .requires(RedstoneUtilsCommands::canUseTeleport)
                             .executes(context -> teleport(context.getSource(), DEFAULT_TELEPORT_RANGE))
@@ -237,6 +246,15 @@ public final class RedstoneUtilsCommands {
         return RedstoneUtilsServerConfig.canUse(Tool.HISTORY, source);
     }
 
+    private static boolean canManageGameRules(CommandSourceStack source) {
+        if (source.getEntity() == null || Commands.hasPermission(Commands.LEVEL_GAMEMASTERS).test(source)) {
+            return true;
+        }
+
+        ServerPlayer player = source.getPlayer();
+        return player != null && player.getAbilities().instabuild;
+    }
+
     private static int sendClientAction(CommandSourceStack source, String action, int value) throws CommandSyntaxException {
         ServerPlayer player = source.getPlayerOrException();
         if (!ServerPlayNetworking.canSend(player, RedstoneUtilsNetworking.ClientCommandPayload.TYPE)) {
@@ -277,6 +295,28 @@ public final class RedstoneUtilsCommands {
         ServerAutoWire.reset(context.getSource().getPlayerOrException());
         context.getSource().sendSuccess(() -> Component.translatable("message.redstoneutils.autowire.reset"), false);
         return 1;
+    }
+
+    private static int showWaterproofRedstone(CommandSourceStack source) {
+        boolean enabled = source.getLevel().getGameRules().get(RedstoneUtilsGameRules.WATERPROOF_REDSTONE);
+        source.sendSuccess(() -> Component.translatable(
+                "message.redstoneutils.waterproof_redstone.query",
+                Component.translatable(enabled ? "state.redstoneutils.on" : "state.redstoneutils.off")
+        ), false);
+        return enabled ? 1 : 0;
+    }
+
+    private static int setWaterproofRedstone(CommandSourceStack source, boolean enabled) {
+        source.getLevel().getGameRules().set(
+                RedstoneUtilsGameRules.WATERPROOF_REDSTONE,
+                enabled,
+                source.getServer()
+        );
+        source.sendSuccess(() -> Component.translatable(
+                "message.redstoneutils.waterproof_redstone.set",
+                Component.translatable(enabled ? "state.redstoneutils.on" : "state.redstoneutils.off")
+        ), true);
+        return enabled ? 1 : 0;
     }
 
     private static CompletableFuture<Suggestions> suggestWireTypes(CommandContext<CommandSourceStack> context, SuggestionsBuilder builder) {

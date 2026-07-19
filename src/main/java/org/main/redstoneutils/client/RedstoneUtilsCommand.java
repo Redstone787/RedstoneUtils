@@ -28,6 +28,7 @@ import java.util.concurrent.CompletableFuture;
 public class RedstoneUtilsCommand {
 
     private static final String ARG_VISIBLE = "visible";
+    private static final String ARG_ENABLED = "enabled";
     private static final String ARG_MODE = "mode";
     private static final String ARG_RANGE = "range";
 
@@ -73,6 +74,13 @@ public class RedstoneUtilsCommand {
                                     .executes(RedstoneUtilsCommand::setAutoWire)))
                     .then(ClientCommands.literal("reset_autowire")
                             .executes(RedstoneUtilsCommand::resetAutoWire))
+                    .then(ClientCommands.literal("waterproof_redstone")
+                            .executes(context -> waterproofRedstone(context, null))
+                            .then(ClientCommands.argument(ARG_ENABLED, BoolArgumentType.bool())
+                                    .executes(context -> waterproofRedstone(
+                                            context,
+                                            BoolArgumentType.getBool(context, ARG_ENABLED)
+                                    ))))
                     .then(ClientCommands.literal("tp")
                             .executes(RedstoneUtilsCommand::teleport)
                             .then(ClientCommands.argument(ARG_RANGE, DoubleArgumentType.doubleArg(10.0D, 1000.0D))
@@ -149,6 +157,20 @@ public class RedstoneUtilsCommand {
 
     private static int resetAutoWire(CommandContext<FabricClientCommandSource> context) {
         AutoWireHandler.setActiveWireType(WireType.NONE);
+        return 1;
+    }
+
+    private static int waterproofRedstone(CommandContext<FabricClientCommandSource> context, Boolean enabled) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (!RedstoneUtilsClientNetworking.hasServerBackend() || minecraft.getConnection() == null) {
+            return feedback(context, Component.translatable("message.redstoneutils.waterproof_redstone.backend_missing"));
+        }
+
+        String command = "redstone_utils waterproof_redstone";
+        if (enabled != null) {
+            command += " " + enabled;
+        }
+        minecraft.getConnection().sendCommand(command);
         return 1;
     }
 

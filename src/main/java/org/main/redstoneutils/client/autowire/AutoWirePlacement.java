@@ -14,6 +14,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -240,7 +241,7 @@ public final class AutoWirePlacement {
         Inventory inventory = player.getInventory();
         int itemSlot = findHotbarSlot(inventory, item);
         if (itemSlot == -1) {
-            return false;
+            return placeWithTemporaryCreativeItem(player, gameMode, inventory, supportBlockPos, item);
         }
 
         int previousSlot = inventory.getSelectedSlot();
@@ -248,6 +249,32 @@ public final class AutoWirePlacement {
         boolean placed = useItemOnBlock(player, gameMode, InteractionHand.MAIN_HAND, supportBlockPos);
         inventory.setSelectedSlot(previousSlot);
         return placed;
+    }
+
+    private static boolean placeWithTemporaryCreativeItem(
+            LocalPlayer player,
+            MultiPlayerGameMode gameMode,
+            Inventory inventory,
+            BlockPos supportBlockPos,
+            Item item
+    ) {
+        if (!player.hasInfiniteMaterials()) {
+            return false;
+        }
+
+        int selectedSlot = inventory.getSelectedSlot();
+        int menuSlot = InventoryMenu.USE_ROW_SLOT_START + selectedSlot;
+        ItemStack previousStack = inventory.getItem(selectedSlot).copy();
+        ItemStack placementStack = new ItemStack(item);
+
+        inventory.setItem(selectedSlot, placementStack);
+        gameMode.handleCreativeModeItemAdd(placementStack, menuSlot);
+        try {
+            return useItemOnBlock(player, gameMode, InteractionHand.MAIN_HAND, supportBlockPos);
+        } finally {
+            inventory.setItem(selectedSlot, previousStack);
+            gameMode.handleCreativeModeItemAdd(previousStack, menuSlot);
+        }
     }
 
     private static boolean useItemOnBlock(LocalPlayer player, MultiPlayerGameMode gameMode, InteractionHand hand, BlockPos supportBlockPos) {

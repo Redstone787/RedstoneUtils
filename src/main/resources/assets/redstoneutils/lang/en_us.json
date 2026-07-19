@@ -1,5 +1,8 @@
 {
   "gamerule.redstoneutils.waterproof_redstone": "Waterproof Redstone",
+  "message.redstoneutils.waterproof_redstone.query": "Waterproof Redstone is %s",
+  "message.redstoneutils.waterproof_redstone.set": "Waterproof Redstone set to %s",
+  "message.redstoneutils.waterproof_redstone.backend_missing": "Waterproof Redstone requires Redstone Utils on the server",
 
   "key.category.redstoneutils.general": "Redstone Utils",
   "key.redstoneutils.teleport": "Teleport to targeted block",
