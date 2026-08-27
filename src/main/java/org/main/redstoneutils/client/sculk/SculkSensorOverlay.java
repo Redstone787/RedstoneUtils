@@ -40,6 +40,7 @@ public final class SculkSensorOverlay {
 
     private static final int SCULK_SENSOR_RADIUS = 8;
     private static final int CALIBRATED_SENSOR_RADIUS = 16;
+    private static final int MAX_RENDERED_SENSORS = 4;
     private static final int FILL_COLOR = 0x2632E6D6;
     private static final int STROKE_COLOR = 0xB034FFE8;
     private static final int SENSOR_FILL_COLOR = 0x4021B8AA;
@@ -95,6 +96,7 @@ public final class SculkSensorOverlay {
             renderData = null;
             return;
         }
+        if (OverlayFreeze.sculkFrozen()) return;
 
         Minecraft minecraft = Minecraft.getInstance();
         LocalPlayer player = minecraft.player;
@@ -160,7 +162,10 @@ public final class SculkSensorOverlay {
             }
         }
 
-        return sensors;
+        sensors.sort(java.util.Comparator.comparingDouble(sensor -> sensor.blockPos().distSqr(playerPos)));
+        return sensors.size() <= MAX_RENDERED_SENSORS
+                ? sensors
+                : new ArrayList<>(sensors.subList(0, MAX_RENDERED_SENSORS));
     }
 
     private static int listenerRadius(BlockState blockState) {

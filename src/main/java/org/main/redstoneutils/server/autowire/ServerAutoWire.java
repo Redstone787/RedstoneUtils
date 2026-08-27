@@ -1,8 +1,10 @@
 package org.main.redstoneutils.server.autowire;
 
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
@@ -12,6 +14,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -26,6 +29,7 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 import org.main.redstoneutils.network.RedstoneUtilsNetworking;
+import org.main.redstoneutils.server.RedstoneUtilsCommands;
 import org.main.redstoneutils.server.history.ChangeHistory;
 
 import java.util.ArrayList;
@@ -57,6 +61,8 @@ public final class ServerAutoWire {
 
         UseBlockCallback.EVENT.register(ServerAutoWire::onUseBlock);
         ServerTickEvents.END_SERVER_TICK.register(ServerAutoWire::tick);
+        ServerLifecycleEvents.SERVER_STOPPED.register(ignored -> clearAll());
+        ServerPlayConnectionEvents.DISCONNECT.register((handler, ignored) -> clearPlayer(handler.player.getUUID()));
     }
 
     public static WireType getWireType(ServerPlayer player) {
@@ -67,6 +73,14 @@ public final class ServerAutoWire {
         PlayerWireState state = stateFor(player.getUUID());
         state.wireType = wireType == null ? WireType.NONE : wireType;
         state.reset();
+        syncState(player, true);
+    }
+
+    public static void deny(ServerPlayer player) {
+        PlayerWireState state = stateFor(player.getUUID());
+        state.wireType = WireType.NONE;
+        state.reset();
+        syncState(player, false);
     }
 
     public static void reset(ServerPlayer player) {
@@ -80,6 +94,11 @@ public final class ServerAutoWire {
 
         WireType wireType = getWireType(serverPlayer);
         if (wireType == WireType.NONE) return InteractionResult.PASS;
+        if (!RedstoneUtilsCommands.canUseAutoWire(serverPlayer.createCommandSourceStack())) {
+            deny(serverPlayer);
+            serverPlayer.sendSystemMessage(Component.translatable("message.redstoneutils.permission.autowire"));
+            return InteractionResult.PASS;
+        }
 
         ItemStack itemStack = player.getItemInHand(hand);
         if (!(itemStack.getItem() instanceof BlockItem blockItem)) {
@@ -165,7 +184,10 @@ public final class ServerAutoWire {
             ServerPlayer player = server.getPlayerList().getPlayer(autoWire.playerUuid);
             if (player != null) {
                 BlockState currentState = autoWire.level.getBlockState(autoWire.blockPos);
-                if (currentState.getBlock() == autoWire.supportBlockState.getBlock()) {
+                if (!RedstoneUtilsCommands.canUseAutoWire(player.createCommandSourceStack())) {
+                    reportFailure(player, PlacementResult.NO_PERMISSION, currentState);
+                    deny(player);
+                } else if (currentState.getBlock() == autoWire.supportBlockState.getBlock()) {
                     stateFor(autoWire.playerUuid).wire(
                             autoWire.wireType,
                             autoWire.level,
@@ -185,6 +207,27 @@ public final class ServerAutoWire {
         return playerStates.computeIfAbsent(uuid, ignored -> new PlayerWireState());
     }
 
+    private static void syncState(ServerPlayer player, boolean accepted) {
+        if (player != null && ServerPlayNetworking.canSend(player, RedstoneUtilsNetworking.AutoWireStatePayload.TYPE)) {
+            ServerPlayNetworking.send(player, new RedstoneUtilsNetworking.AutoWireStatePayload(
+                    getWireType(player).key(),
+                    accepted
+            ));
+        }
+    }
+
+    private static void clearPlayer(UUID playerId) {
+        playerStates.remove(playerId);
+        pendingPlacements.removeIf(placement -> playerId.equals(placement.playerUuid));
+        pendingAutoWires.removeIf(placement -> playerId.equals(placement.playerUuid));
+    }
+
+    private static void clearAll() {
+        playerStates.clear();
+        pendingPlacements.clear();
+        pendingAutoWires.clear();
+    }
+
     private static PlacementResult placeOnTop(ServerLevel level, ServerPlayer player, BlockPos supportBlockPos, PlaceableBlock block) {
         return placeOnTop(level, player, supportBlockPos, block.defaultState(playerFacing(player), player), block.item());
     }
@@ -199,6 +242,8 @@ public final class ServerAutoWire {
 
         if (!level.isInWorldBounds(blockPos)) return PlacementResult.OUTSIDE_WORLD;
         if (!player.mayInteract(level, blockPos)) return PlacementResult.NO_PERMISSION;
+        if (!RedstoneUtilsCommands.canUseAutoWire(player.createCommandSourceStack())) return PlacementResult.NO_PERMISSION;
+        if (!hasPlacementItem(player, item)) return PlacementResult.MISSING_ITEM;
 
         BlockState currentState = level.getBlockState(blockPos);
         if (!canReplace(currentState, placementState)) return PlacementResult.TARGET_OCCUPIED;
@@ -223,8 +268,44 @@ public final class ServerAutoWire {
             transaction.rollback();
             return PlacementResult.CANNOT_SURVIVE;
         }
+        if (!consumePlacementItem(player, item)) {
+            transaction.rollback();
+            return PlacementResult.MISSING_ITEM;
+        }
         transaction.commit();
         return PlacementResult.SUCCESS;
+    }
+
+    private static boolean hasPlacementItem(ServerPlayer player, Item item) {
+        if (player.hasInfiniteMaterials()) return true;
+        Inventory inventory = player.getInventory();
+        for (ItemStack stack : inventory.getNonEquipmentItems()) {
+            if (!stack.isEmpty() && stack.is(item)) return true;
+        }
+        ItemStack offhand = inventory.getItem(Inventory.SLOT_OFFHAND);
+        return !offhand.isEmpty() && offhand.is(item);
+    }
+
+    private static boolean consumePlacementItem(ServerPlayer player, Item item) {
+        if (player.hasInfiniteMaterials()) return true;
+        Inventory inventory = player.getInventory();
+        for (int slot = 0; slot < inventory.getNonEquipmentItems().size(); slot++) {
+            ItemStack stack = inventory.getItem(slot);
+            if (!stack.isEmpty() && stack.is(item)) {
+                stack.shrink(1);
+                inventory.setChanged();
+                player.containerMenu.broadcastChanges();
+                return true;
+            }
+        }
+        ItemStack offhand = inventory.getItem(Inventory.SLOT_OFFHAND);
+        if (!offhand.isEmpty() && offhand.is(item)) {
+            offhand.shrink(1);
+            inventory.setChanged();
+            player.containerMenu.broadcastChanges();
+            return true;
+        }
+        return false;
     }
 
     private static BlockState resolvePlacementState(ServerPlayer player, BlockPos supportBlockPos, BlockState fallbackState, Item item) {
@@ -561,6 +642,7 @@ public final class ServerAutoWire {
         CANNOT_SURVIVE("cannot_survive"),
         OUTSIDE_WORLD("outside_world"),
         NO_PERMISSION("no_permission"),
+        MISSING_ITEM("missing_item"),
         PLACEMENT_REJECTED("placement_rejected"),
         MISSING_SUPPORT("missing_support");
 

@@ -4,6 +4,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
@@ -18,8 +19,10 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.ColorCollection;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
+import org.main.redstoneutils.client.autowire.AutoWire;
 import org.main.redstoneutils.client.autowire.AutoWireHandler;
 import org.main.redstoneutils.client.autowire.WireType;
+import org.main.redstoneutils.client.sculk.SculkInfoScreen;
 import org.main.redstoneutils.client.teleport.TpUtil;
 
 import java.util.Locale;
@@ -28,13 +31,27 @@ import java.util.concurrent.CompletableFuture;
 public class RedstoneUtilsCommand {
 
     private static final String ARG_VISIBLE = "visible";
-    private static final String ARG_ENABLED = "enabled";
     private static final String ARG_MODE = "mode";
     private static final String ARG_RANGE = "range";
 
     public static void init() {
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, buildContext) -> {
-            dispatcher.register(ClientCommands.literal("overlay")
+            dispatcher.register(overlayCommand());
+
+            dispatcher.register(ClientCommands.literal("color")
+                    .executes(RedstoneUtilsCommand::colorCommand));
+
+            dispatcher.register(redstoneUtilsCommand());
+            dispatcher.register(ClientCommands.literal("macro")
+                    .executes(RedstoneUtilsCommand::openMacros));
+            dispatcher.register(ClientCommands.literal("sculkinfo")
+                    .executes(RedstoneUtilsCommand::openSculkInfo));
+            dispatcher.register(autoWireCommand());
+        });
+    }
+
+    private static LiteralArgumentBuilder<FabricClientCommandSource> overlayCommand() {
+        return ClientCommands.literal("overlay")
                     .executes(context -> setAllOverlays(context, !allOverlaysVisible()))
                     .then(ClientCommands.literal("wire")
                             .executes(context -> setWireOverlay(context, !RedstoneUtilsClientActions.wireOverlayVisible()))
@@ -52,41 +69,36 @@ public class RedstoneUtilsCommand {
                             .executes(context -> setAllOverlays(context, !allOverlaysVisible()))
                             .then(ClientCommands.argument(ARG_VISIBLE, BoolArgumentType.bool())
                                     .executes(context -> setAllOverlays(context, BoolArgumentType.getBool(context, ARG_VISIBLE)))))
-            );
+            ;
+    }
 
-            dispatcher.register(ClientCommands.literal("color")
-                    .executes(RedstoneUtilsCommand::colorCommand));
+    private static LiteralArgumentBuilder<FabricClientCommandSource> redstoneUtilsCommand() {
+        return ClientCommands.literal("redstoneutils")
+                .executes(RedstoneUtilsCommand::openToolbox)
+                .then(ClientCommands.literal("config")
+                        .executes(RedstoneUtilsCommand::openConfig))
+                .then(ClientCommands.literal("toolbox")
+                        .executes(RedstoneUtilsCommand::openToolbox))
+                .then(ClientCommands.literal("macro")
+                        .executes(RedstoneUtilsCommand::openMacros))
+                .then(ClientCommands.literal("sculkinfo")
+                        .executes(RedstoneUtilsCommand::openSculkInfo))
+                .then(ClientCommands.literal("color")
+                        .executes(RedstoneUtilsCommand::colorCommand))
+                .then(overlayCommand())
+                .then(autoWireCommand())
+                .then(ClientCommands.literal("teleport")
+                        .executes(RedstoneUtilsCommand::teleport)
+                        .then(ClientCommands.argument(ARG_RANGE, DoubleArgumentType.doubleArg(10.0D, 1000.0D))
+                                .executes(RedstoneUtilsCommand::teleportRange)));
+    }
 
-            dispatcher.register(ClientCommands.literal("redstone_utils")
-                    .then(ClientCommands.literal("config")
-                            .executes(RedstoneUtilsCommand::openConfig))
-                    .then(ClientCommands.literal("toolbox")
-                            .executes(context -> {
-                                org.main.redstoneutils.client.ui.ToolboxScreen.open();
-                                return 1;
-                            }))
-                    .then(ClientCommands.literal("macros")
-                            .executes(RedstoneUtilsCommand::openMacros))
-                    .then(ClientCommands.literal("autowire")
-                            .executes(RedstoneUtilsCommand::showAutoWire)
-                            .then(ClientCommands.argument(ARG_MODE, StringArgumentType.word())
-                                    .suggests(RedstoneUtilsCommand::suggestWireTypes)
-                                    .executes(RedstoneUtilsCommand::setAutoWire)))
-                    .then(ClientCommands.literal("reset_autowire")
-                            .executes(RedstoneUtilsCommand::resetAutoWire))
-                    .then(ClientCommands.literal("waterproof_redstone")
-                            .executes(context -> waterproofRedstone(context, null))
-                            .then(ClientCommands.argument(ARG_ENABLED, BoolArgumentType.bool())
-                                    .executes(context -> waterproofRedstone(
-                                            context,
-                                            BoolArgumentType.getBool(context, ARG_ENABLED)
-                                    ))))
-                    .then(ClientCommands.literal("tp")
-                            .executes(RedstoneUtilsCommand::teleport)
-                            .then(ClientCommands.argument(ARG_RANGE, DoubleArgumentType.doubleArg(10.0D, 1000.0D))
-                                    .executes(RedstoneUtilsCommand::teleportRange)))
-            );
-        });
+    private static LiteralArgumentBuilder<FabricClientCommandSource> autoWireCommand() {
+        return ClientCommands.literal("autowire")
+                .executes(RedstoneUtilsCommand::showAutoWire)
+                .then(ClientCommands.argument(ARG_MODE, StringArgumentType.word())
+                        .suggests(RedstoneUtilsCommand::suggestWireTypes)
+                        .executes(RedstoneUtilsCommand::setAutoWire));
     }
 
     private static int setWireOverlay(CommandContext<FabricClientCommandSource> context, boolean visible) {
@@ -135,9 +147,19 @@ public class RedstoneUtilsCommand {
         return feedback(context, Component.translatable("message.redstoneutils.opened_config"));
     }
 
+    private static int openToolbox(CommandContext<FabricClientCommandSource> context) {
+        org.main.redstoneutils.client.ui.ToolboxScreen.open();
+        return 1;
+    }
+
     private static int openMacros(CommandContext<FabricClientCommandSource> context) {
         RedstoneUtilsClientActions.openMacros();
         return feedback(context, Component.translatable("message.redstoneutils.opened_macros"));
+    }
+
+    private static int openSculkInfo(CommandContext<FabricClientCommandSource> context) {
+        SculkInfoScreen.open();
+        return 1;
     }
 
     private static int showAutoWire(CommandContext<FabricClientCommandSource> context) {
@@ -146,6 +168,7 @@ public class RedstoneUtilsCommand {
 
     private static int setAutoWire(CommandContext<FabricClientCommandSource> context) {
         String mode = StringArgumentType.getString(context, ARG_MODE);
+        if ("reset".equalsIgnoreCase(mode)) return resetAutoWire(context);
         WireType wireType = findWireType(mode);
         if (wireType == null) {
             return feedback(context, Component.translatable("message.redstoneutils.autowire.unknown", wireTypeSuggestions()));
@@ -156,22 +179,13 @@ public class RedstoneUtilsCommand {
     }
 
     private static int resetAutoWire(CommandContext<FabricClientCommandSource> context) {
-        AutoWireHandler.setActiveWireType(WireType.NONE);
-        return 1;
-    }
-
-    private static int waterproofRedstone(CommandContext<FabricClientCommandSource> context, Boolean enabled) {
-        Minecraft minecraft = Minecraft.getInstance();
-        if (!RedstoneUtilsClientNetworking.hasServerBackend() || minecraft.getConnection() == null) {
-            return feedback(context, Component.translatable("message.redstoneutils.waterproof_redstone.backend_missing"));
+        AutoWire.reset();
+        if (RedstoneUtilsClientNetworking.hasAutoWireBackend()
+                && RedstoneUtilsClientNetworking.sendServerCommand("autowire reset")) {
+            return 1;
         }
 
-        String command = "redstone_utils waterproof_redstone";
-        if (enabled != null) {
-            command += " " + enabled;
-        }
-        minecraft.getConnection().sendCommand(command);
-        return 1;
+        return feedback(context, Component.translatable("message.redstoneutils.autowire.reset"));
     }
 
     private static int teleport(CommandContext<FabricClientCommandSource> context) {
@@ -181,17 +195,15 @@ public class RedstoneUtilsCommand {
 
     private static int teleportRange(CommandContext<FabricClientCommandSource> context) {
         double range = DoubleArgumentType.getDouble(context, ARG_RANGE);
-        if (RedstoneUtilsClientNetworking.teleport(range)) {
-            return 1;
-        }
-
-        return feedback(context, Component.translatable("message.redstoneutils.teleport.backend_missing"));
+        TpUtil.teleportToBlock(range);
+        return 1;
     }
 
     private static CompletableFuture<Suggestions> suggestWireTypes(CommandContext<FabricClientCommandSource> context, SuggestionsBuilder builder) {
         for (WireType wireType : WireType.values()) {
             builder.suggest(wireType.name().toLowerCase(Locale.ROOT));
         }
+        builder.suggest("reset");
         return builder.buildFuture();
     }
 

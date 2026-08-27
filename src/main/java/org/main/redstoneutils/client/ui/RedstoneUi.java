@@ -144,7 +144,10 @@ public final class RedstoneUi {
 
     private static List<String> finishWrappedLines(Font font, List<String> lines, int maxWidth) {
         int lastIndex = lines.size() - 1;
-        lines.set(lastIndex, fitEnd(font, lines.get(lastIndex), maxWidth));
+        String suffix = "...";
+        String last = lines.get(lastIndex);
+        int available = maxWidth - font.width(suffix);
+        lines.set(lastIndex, available <= 0 ? "" : font.plainSubstrByWidth(last, available) + suffix);
         return lines;
     }
 

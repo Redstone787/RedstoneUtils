@@ -25,18 +25,29 @@ dependencies {
 
     // Fabric API. This is technically optional, but you probably want it anyway.
     implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+
+    testImplementation platform("org.junit:junit-bom:5.11.4")
+    testImplementation "org.junit.jupiter:junit-jupiter"
+    testRuntimeOnly "org.junit.platform:junit-platform-launcher"
 }
 
+test {
+    useJUnitPlatform()
+}
+
+def resourceVersion = version
+def resourceMinecraftVersion = minecraft_version
+def resourceLoaderVersion = loader_version
 processResources {
-    inputs.property "version", project.version
-    inputs.property "minecraft_version", project.minecraft_version
-    inputs.property "loader_version", project.loader_version
+    inputs.property "version", resourceVersion
+    inputs.property "minecraft_version", resourceMinecraftVersion
+    inputs.property "loader_version", resourceLoaderVersion
     filteringCharset = "UTF-8"
 
     filesMatching("fabric.mod.json") {
-        expand "version": project.version,
-                "minecraft_version": project.minecraft_version,
-                "loader_version": project.loader_version
+        expand "version": resourceVersion,
+                "minecraft_version": resourceMinecraftVersion,
+                "loader_version": resourceLoaderVersion
     }
 }
 
@@ -63,9 +74,10 @@ java {
     withSourcesJar()
 }
 
+def licenseArchiveName = archives_base_name
 jar {
     from("LICENSE") {
-        rename { "${it}_${project.archives_base_name}" }
+        rename { "${it}_${licenseArchiveName}" }
     }
 }
 

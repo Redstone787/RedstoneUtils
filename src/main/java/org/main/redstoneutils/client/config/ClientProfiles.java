@@ -12,6 +12,7 @@ import org.main.redstoneutils.client.ui.RedstoneOverlay;
 
 import java.net.SocketAddress;
 import java.util.Locale;
+import net.minecraft.world.level.storage.LevelResource;
 
 /** Selects a persistent world/server profile whenever the play connection changes. */
 public final class ClientProfiles {
@@ -40,8 +41,10 @@ public final class ClientProfiles {
 
     private static String profileKey(Minecraft client, SocketAddress remoteAddress) {
         if (client.getSingleplayerServer() != null) {
-            String worldName = client.getSingleplayerServer().getWorldData().getLevelName();
-            return "world:" + normalize(worldName);
+            java.nio.file.Path worldPath = client.getSingleplayerServer().getWorldPath(LevelResource.ROOT).normalize();
+            java.nio.file.Path directory = worldPath.getFileName();
+            String worldId = directory == null ? worldPath.toString() : directory.toString();
+            return "world:" + normalize(worldId);
         }
         ServerData serverData = client.getCurrentServer();
         String address = serverData == null ? String.valueOf(remoteAddress) : serverData.ip;

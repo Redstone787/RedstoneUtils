@@ -22,11 +22,19 @@ public final class TpUtil {
     }
 
     public static void teleportToBlock() {
+        teleportToBlock(RedstoneUtilsConfig.getTeleportMaxRange());
+    }
+
+    public static void teleportToBlock(double requestedRange) {
         Minecraft minecraft = Minecraft.getInstance();
         Player player = minecraft.player;
         if (player == null) return;
 
-        double maxRange = RedstoneUtilsConfig.getTeleportMaxRange();
+        double maxRange = Math.clamp(
+                Double.isFinite(requestedRange) ? requestedRange : RedstoneUtilsConfig.getTeleportMaxRange(),
+                10.0D,
+                1_000.0D
+        );
         if (RedstoneUtilsClientNetworking.teleport(maxRange)) {
             return;
         }
@@ -65,7 +73,7 @@ public final class TpUtil {
 
         if (minecraft.getConnection() != null) {
             minecraft.getConnection().sendCommand(formatTeleportCommand(targetPos));
-            sendTeleportFeedback(targetPos);
+            RedstoneMessages.popup(Component.translatable("message.redstoneutils.teleport.requested"));
             return;
         }
 
@@ -74,10 +82,8 @@ public final class TpUtil {
 
     private static void sendTeleportFeedback(Vec3 targetPos) {
         RedstoneMessages.popup(Component.translatable(
-                "message.redstoneutils.teleported",
-                (int) targetPos.x,
-                (int) targetPos.y,
-                (int) targetPos.z
+                "message.redstoneutils.teleported_exact",
+                String.format(Locale.ROOT, "%.2f %.2f %.2f", targetPos.x, targetPos.y, targetPos.z)
         ));
     }
 

@@ -21,10 +21,9 @@ import java.util.List;
 public final class ToolboxScreen extends Screen {
 
     private static final int WIDTH = 360;
-    private static final int HEIGHT = 250;
-    private static final int BUTTON_WIDTH = 158;
-    private static final int BUTTON_HEIGHT = 28;
-    private static final int GAP = 10;
+    private static final int HEIGHT = 236;
+    private static final int BUTTON_HEIGHT = 24;
+    private static final int GAP = 6;
 
     private final List<Tool> tools = List.of(
             new Tool("toolbox.redstoneutils.autowire", this::nextAutoWire),
@@ -52,34 +51,36 @@ public final class ToolboxScreen extends Screen {
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float deltaTicks) {
-        int x = (graphics.guiWidth() - WIDTH) / 2;
-        int y = (graphics.guiHeight() - HEIGHT) / 2;
-        RedstoneUi.drawPanel(graphics, x, y, WIDTH, HEIGHT);
+        Layout layout = layout(graphics.guiWidth(), graphics.guiHeight());
+        int x = layout.x();
+        int y = layout.y();
+        RedstoneUi.drawPanel(graphics, x, y, layout.width(), layout.height());
         graphics.text(font, title, x + 14, y + 12, RedstoneUi.TEXT_COLOR, false);
         graphics.text(font, Component.translatable("screen.redstoneutils.toolbox.subtitle"), x + 14, y + 30, RedstoneUi.MUTED_TEXT_COLOR, false);
 
         for (int index = 0; index < tools.size(); index++) {
             int column = index % 2;
             int row = index / 2;
-            int buttonX = x + 12 + column * (BUTTON_WIDTH + GAP);
+            int buttonX = x + 12 + column * (layout.buttonWidth() + GAP);
             int buttonY = y + 54 + row * (BUTTON_HEIGHT + GAP);
-            boolean hovered = RedstoneUi.contains(mouseX, mouseY, buttonX, buttonY, BUTTON_WIDTH, BUTTON_HEIGHT);
-            RedstoneUi.drawButton(graphics, font, label(tools.get(index)), buttonX, buttonY, BUTTON_WIDTH, BUTTON_HEIGHT, hovered, RedstoneUi.ButtonTone.NORMAL);
+            boolean hovered = RedstoneUi.contains(mouseX, mouseY, buttonX, buttonY, layout.buttonWidth(), BUTTON_HEIGHT);
+            RedstoneUi.drawButton(graphics, font, label(tools.get(index)), buttonX, buttonY, layout.buttonWidth(), BUTTON_HEIGHT, hovered, RedstoneUi.ButtonTone.NORMAL);
         }
 
         String profile = Component.translatable("screen.redstoneutils.toolbox.profile", org.main.redstoneutils.client.config.RedstoneUtilsConfig.activeProfile()).getString();
-        RedstoneUi.drawFittedText(graphics, font, profile, x + 14, y + HEIGHT - 22, WIDTH - 28, RedstoneUi.DETAIL_TEXT_COLOR);
+        RedstoneUi.drawFittedText(graphics, font, profile, x + 14, y + layout.height() - 22, layout.width() - 28, RedstoneUi.DETAIL_TEXT_COLOR);
     }
 
     @Override
     public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
         if (event.button() != InputConstants.MOUSE_BUTTON_LEFT) return true;
-        int x = (width - WIDTH) / 2;
-        int y = (height - HEIGHT) / 2;
+        Layout layout = layout(width, height);
+        int x = layout.x();
+        int y = layout.y();
         for (int index = 0; index < tools.size(); index++) {
-            int buttonX = x + 12 + index % 2 * (BUTTON_WIDTH + GAP);
+            int buttonX = x + 12 + index % 2 * (layout.buttonWidth() + GAP);
             int buttonY = y + 54 + index / 2 * (BUTTON_HEIGHT + GAP);
-            if (RedstoneUi.contains(event.x(), event.y(), buttonX, buttonY, BUTTON_WIDTH, BUTTON_HEIGHT)) {
+            if (RedstoneUi.contains(event.x(), event.y(), buttonX, buttonY, layout.buttonWidth(), BUTTON_HEIGHT)) {
                 AbstractWidget.playButtonClickSound(Minecraft.getInstance().getSoundManager());
                 tools.get(index).action().run();
                 return true;
@@ -123,6 +124,16 @@ public final class ToolboxScreen extends Screen {
 
     private void openCommand(String command) {
         Minecraft.getInstance().gui.setScreen(new ChatScreen(command, false));
+    }
+
+    private static Layout layout(int screenWidth, int screenHeight) {
+        int width = Math.min(WIDTH, Math.max(1, screenWidth - 16));
+        int height = Math.min(HEIGHT, Math.max(1, screenHeight - 8));
+        int buttonWidth = Math.max(1, (width - 24 - GAP) / 2);
+        return new Layout((screenWidth - width) / 2, (screenHeight - height) / 2, width, height, buttonWidth);
+    }
+
+    private record Layout(int x, int y, int width, int height, int buttonWidth) {
     }
 
     private record Tool(String translationKey, Runnable action) {

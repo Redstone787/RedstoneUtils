@@ -16,6 +16,7 @@ import org.main.redstoneutils.client.autowire.WireType;
 import org.main.redstoneutils.client.teleport.TpUtil;
 import org.main.redstoneutils.client.ui.CircleSegment;
 import org.main.redstoneutils.client.ui.RedstoneOverlay;
+import org.main.redstoneutils.client.ui.RedstoneMessages;
 import org.main.redstoneutils.client.ui.ToolboxScreen;
 
 import java.util.HashMap;
@@ -72,12 +73,12 @@ public final class Keybindings {
         if (isWireMenuScreenOpen()) return;
 
         boolean isWireMenuKeyDown = wireMenuKey.isDown();
+
         if (isWireMenuKeyDown && !wasWireMenuKeyDown) {
             openWireMenuScreen();
         } else if (!isWireMenuKeyDown && wasWireMenuKeyDown) {
             closeWireMenuScreen();
         }
-
         wasWireMenuKeyDown = isWireMenuKeyDown;
     }
 
@@ -88,19 +89,23 @@ public final class Keybindings {
     private static void openWireMenuScreen() {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.gui.screen() != null) return;
+        if (!RedstoneOverlay.isVisible()) {
+            RedstoneMessages.chat(Component.translatable("message.redstoneutils.wire_menu.hud_disabled"));
+            return;
+        }
 
         List<WireType> wireTypes = AutoWireHandler.getSelectableWireTypes();
         if (wireTypes.isEmpty()) return;
 
         CircleSegment activeSegment = CircleSegment.fromIndex(
-                AutoWireHandler.getSelectableWireTypeIndex(AutoWireHandler.getActiveWireType())
+            AutoWireHandler.getSelectableWireTypeIndex(AutoWireHandler.getActiveWireType())
         );
 
         RedstoneOverlay.setSegmentWheel(
-                true,
-                wireTypes.size(),
-                AutoWireHandler.getSelectableWireTextures(),
-                activeSegment
+            true,
+            wireTypes.size(),
+            AutoWireHandler.getSelectableWireTextures(),
+            activeSegment
         );
         minecraft.gui.setScreen(new WireMenuScreen());
     }
@@ -112,8 +117,6 @@ public final class Keybindings {
         if (minecraft.gui.screen() instanceof WireMenuScreen) {
             minecraft.gui.setScreen(null);
         }
-
-        wasWireMenuKeyDown = false;
     }
 
     private static void finishWireMenuSelection() {
@@ -129,7 +132,7 @@ public final class Keybindings {
         return KeyMappingHelper.registerKeyMapping(
             new KeyMapping(
                 name,
-                InputConstants.Type.KEYSYM.ordinal(),
+                InputConstants.UNKNOWN.getValue(),
                 CATEGORY
             )
         );
@@ -152,8 +155,28 @@ public final class Keybindings {
 
         @Override
         public boolean keyPressed(KeyEvent event) {
+            if (event.key() == InputConstants.KEY_ESCAPE) {
+                closeWireMenuScreen();
+                return true;
+            }
             setMovementKeyState(event, true);
             return true;
+        }
+
+        @Override
+        public void tick() {
+            if (wireMenuKey == null) return;
+
+            InputConstants.Key boundKey = InputConstants.getKey(wireMenuKey.saveString());
+            if (boundKey.getType() == InputConstants.Type.KEYSYM) {
+                boolean physicallyDown = InputConstants.isKeyDown(
+                    Minecraft.getInstance().getWindow(),
+                    boundKey.getValue()
+                );
+                if (!physicallyDown) {
+                    closeWireMenuScreen();
+                }
+            }
         }
 
         @Override
@@ -163,7 +186,6 @@ public final class Keybindings {
             } else {
                 setMovementKeyState(event, false);
             }
-
             return true;
         }
 
@@ -183,7 +205,6 @@ public final class Keybindings {
             if (wireMenuKey != null && wireMenuKey.matchesMouse(event)) {
                 closeWireMenuScreen();
             }
-
             return true;
         }
 
@@ -199,7 +220,7 @@ public final class Keybindings {
 
         @Override
         public boolean shouldCloseOnEsc() {
-            return false;
+            return true;
         }
 
         @Override
@@ -217,6 +238,7 @@ public final class Keybindings {
             if (RedstoneOverlay.isSegmentWheelVisible()) {
                 finishWireMenuSelection();
             }
+            super.removed();
         }
 
         private void setMovementKeyState(KeyEvent event, boolean pressed) {
@@ -231,18 +253,18 @@ public final class Keybindings {
             for (KeyMapping movementKey : movementKeys()) {
                 InputConstants.Key boundKey = InputConstants.getKey(movementKey.saveString());
                 boolean pressed = !movementKey.isUnbound()
-                        && boundKey.getType() == InputConstants.Type.KEYSYM
-                        && InputConstants.isKeyDown(minecraft.getWindow(), boundKey.getValue());
+                    && boundKey.getType() == InputConstants.Type.KEYSYM
+                    && InputConstants.isKeyDown(minecraft.getWindow(), boundKey.getValue());
                 movementKey.setDown(pressed);
             }
         }
 
         private KeyMapping[] movementKeys() {
             return new KeyMapping[]{
-                    minecraft.options.keyUp,
-                    minecraft.options.keyDown,
-                    minecraft.options.keyLeft,
-                    minecraft.options.keyRight
+                minecraft.options.keyUp,
+                minecraft.options.keyDown,
+                minecraft.options.keyLeft,
+                minecraft.options.keyRight
             };
         }
     }

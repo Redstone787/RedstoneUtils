@@ -20,13 +20,12 @@ import java.util.UUID;
 
 final class MacroEditScreen extends Screen {
 
-    private static final int PANEL_MIN_WIDTH = 430;
+    private static final int PANEL_MIN_WIDTH = 300;
     private static final int PANEL_MAX_WIDTH = 580;
-    private static final int PANEL_MIN_HEIGHT = 310;
+    private static final int PANEL_MIN_HEIGHT = 246;
     private static final int PANEL_MAX_HEIGHT = 430;
     private static final int FIELD_HEIGHT = 20;
     private static final int BUTTON_HEIGHT = 24;
-    private static final int TYPE_BUTTON_WIDTH = 126;
     private static final int FOOTER_BUTTON_WIDTH = 90;
 
     private final Screen parent;
@@ -61,7 +60,7 @@ final class MacroEditScreen extends Screen {
         this.mouseButton = macro != null && macro.mouseButton();
         this.modifiers = macro == null ? 0 : macro.modifiers();
         this.trigger = macro == null ? Macro.MacroTrigger.PRESSED : macro.trigger();
-        this.enabled = macro == null || macro.enabled();
+        this.enabled = macro == null ? Macro.DEFAULT_ENABLED : macro.enabled();
         this.categoryValue = macro == null ? "General" : macro.category();
         this.nameValue = macro == null ? "" : macro.name();
         this.commandValue = macro == null ? "" : MacroCommandText.formatCommand(macro.command());
@@ -84,9 +83,9 @@ final class MacroEditScreen extends Screen {
     protected void init() {
         captureFieldValues();
 
-        nameBox = addWidget(createBox(text("macro.redstoneutils.name"), nameValue, 80));
-        commandBox = addWidget(createBox(text("macro.redstoneutils.command"), commandValue, 512));
-        aliasBox = addWidget(createBox(text("macro.redstoneutils.alias"), aliasValue, 64));
+        nameBox = addWidget(createBox(text("macro.redstoneutils.name"), nameValue, Macro.MAX_NAME_LENGTH));
+        commandBox = addWidget(createBox(text("macro.redstoneutils.command"), commandValue, Macro.MAX_COMMAND_LENGTH));
+        aliasBox = addWidget(createBox(text("macro.redstoneutils.alias"), aliasValue, Macro.MAX_ALIAS_LENGTH));
         categoryBox = addWidget(createBox(text("macro.redstoneutils.category"), categoryValue, 48));
         positionFields(layout(width, height));
     }
@@ -126,19 +125,19 @@ final class MacroEditScreen extends Screen {
 
         if (event.button() != InputConstants.MOUSE_BUTTON_LEFT) return true;
 
-        if (RedstoneUi.contains(mouseX, mouseY, layout.keybindTypeX(), layout.typeY(), TYPE_BUTTON_WIDTH, BUTTON_HEIGHT)) {
+        if (RedstoneUi.contains(mouseX, mouseY, layout.keybindTypeX(), layout.typeY(), layout.typeButtonWidth(), BUTTON_HEIGHT)) {
             setType(MacroType.KEYBIND);
             playClick();
             return true;
         }
 
-        if (RedstoneUi.contains(mouseX, mouseY, layout.commandTypeX(), layout.typeY(), TYPE_BUTTON_WIDTH, BUTTON_HEIGHT)) {
+        if (RedstoneUi.contains(mouseX, mouseY, layout.commandTypeX(), layout.typeY(), layout.typeButtonWidth(), BUTTON_HEIGHT)) {
             setType(MacroType.COMMAND);
             playClick();
             return true;
         }
 
-        if (type == MacroType.KEYBIND && RedstoneUi.contains(mouseX, mouseY, layout.fieldX(), layout.bindingFieldY(), layout.fieldWidth(), FIELD_HEIGHT)) {
+        if (type == MacroType.KEYBIND && RedstoneUi.contains(mouseX, mouseY, layout.bindingX(), layout.bindingFieldY(), layout.columnWidth(), FIELD_HEIGHT)) {
             setFieldFocus(null);
             capturingKey = true;
             error = "";
@@ -146,31 +145,31 @@ final class MacroEditScreen extends Screen {
             return true;
         }
 
-        if (type == MacroType.KEYBIND && RedstoneUi.contains(mouseX, mouseY, layout.fieldX(), layout.triggerY(), 160, BUTTON_HEIGHT)) {
+        if (type == MacroType.KEYBIND && RedstoneUi.contains(mouseX, mouseY, layout.triggerX(), layout.triggerY(), layout.columnWidth(), BUTTON_HEIGHT)) {
             trigger = Macro.MacroTrigger.values()[(trigger.ordinal() + 1) % Macro.MacroTrigger.values().length];
             playClick();
             return true;
         }
 
-        if (RedstoneUi.contains(mouseX, mouseY, layout.fieldX() + 170, layout.triggerY(), 140, BUTTON_HEIGHT)) {
+        if (RedstoneUi.contains(mouseX, mouseY, layout.enabledX(), layout.triggerY(), layout.columnWidth(), BUTTON_HEIGHT)) {
             enabled = !enabled;
             playClick();
             return true;
         }
 
-        if (RedstoneUi.contains(mouseX, mouseY, layout.saveX(), layout.footerButtonY(), FOOTER_BUTTON_WIDTH, BUTTON_HEIGHT)) {
+        if (RedstoneUi.contains(mouseX, mouseY, layout.saveX(), layout.footerButtonY(), layout.footerButtonWidth(), BUTTON_HEIGHT)) {
             saveAndClose();
             playClick();
             return true;
         }
 
-        if (RedstoneUi.contains(mouseX, mouseY, layout.cancelX(), layout.footerButtonY(), FOOTER_BUTTON_WIDTH, BUTTON_HEIGHT)) {
+        if (RedstoneUi.contains(mouseX, mouseY, layout.cancelX(), layout.footerButtonY(), layout.footerButtonWidth(), BUTTON_HEIGHT)) {
             returnToList();
             playClick();
             return true;
         }
 
-        if (editing && RedstoneUi.contains(mouseX, mouseY, layout.deleteX(), layout.footerButtonY(), FOOTER_BUTTON_WIDTH, BUTTON_HEIGHT)) {
+        if (editing && RedstoneUi.contains(mouseX, mouseY, layout.deleteX(), layout.footerButtonY(), layout.footerButtonWidth(), BUTTON_HEIGHT)) {
             captureFieldValues();
             Minecraft.getInstance().gui.setScreen(new ConfirmScreen(confirmed -> {
                 if (confirmed) MacroStore.delete(originalId);
@@ -248,53 +247,59 @@ final class MacroEditScreen extends Screen {
     }
 
     private void drawTypeSelector(GuiGraphicsExtractor graphics, Layout layout, int mouseX, int mouseY) {
-        boolean keybindHovered = RedstoneUi.contains(mouseX, mouseY, layout.keybindTypeX(), layout.typeY(), TYPE_BUTTON_WIDTH, BUTTON_HEIGHT);
-        boolean commandHovered = RedstoneUi.contains(mouseX, mouseY, layout.commandTypeX(), layout.typeY(), TYPE_BUTTON_WIDTH, BUTTON_HEIGHT);
+        boolean keybindHovered = RedstoneUi.contains(mouseX, mouseY, layout.keybindTypeX(), layout.typeY(), layout.typeButtonWidth(), BUTTON_HEIGHT);
+        boolean commandHovered = RedstoneUi.contains(mouseX, mouseY, layout.commandTypeX(), layout.typeY(), layout.typeButtonWidth(), BUTTON_HEIGHT);
 
-        RedstoneUi.drawButton(graphics, font, text("macro.redstoneutils.keybind"), layout.keybindTypeX(), layout.typeY(), TYPE_BUTTON_WIDTH, BUTTON_HEIGHT, keybindHovered, type == MacroType.KEYBIND ? RedstoneUi.ButtonTone.ACTIVE : RedstoneUi.ButtonTone.NORMAL);
-        RedstoneUi.drawButton(graphics, font, text("macro.redstoneutils.command_type"), layout.commandTypeX(), layout.typeY(), TYPE_BUTTON_WIDTH, BUTTON_HEIGHT, commandHovered, type == MacroType.COMMAND ? RedstoneUi.ButtonTone.ACTIVE : RedstoneUi.ButtonTone.NORMAL);
+        RedstoneUi.drawButton(graphics, font, text("macro.redstoneutils.keybind"), layout.keybindTypeX(), layout.typeY(), layout.typeButtonWidth(), BUTTON_HEIGHT, keybindHovered, type == MacroType.KEYBIND ? RedstoneUi.ButtonTone.ACTIVE : RedstoneUi.ButtonTone.NORMAL);
+        RedstoneUi.drawButton(graphics, font, text("macro.redstoneutils.command_type"), layout.commandTypeX(), layout.typeY(), layout.typeButtonWidth(), BUTTON_HEIGHT, commandHovered, type == MacroType.COMMAND ? RedstoneUi.ButtonTone.ACTIVE : RedstoneUi.ButtonTone.NORMAL);
     }
 
     private void drawFields(GuiGraphicsExtractor graphics, Layout layout, int mouseX, int mouseY, float deltaTicks) {
-        drawLabel(graphics, text("macro.redstoneutils.name"), layout.fieldX(), layout.nameLabelY());
+        drawLabel(graphics, text("macro.redstoneutils.name"), layout.nameX(), layout.nameLabelY());
         nameBox.extractRenderState(graphics, mouseX, mouseY, deltaTicks);
 
-        drawLabel(graphics, text("macro.redstoneutils.command_to_run"), layout.fieldX(), layout.commandLabelY());
+        drawLabel(graphics, text("macro.redstoneutils.command_to_run"), layout.commandX(), layout.commandLabelY());
         commandBox.extractRenderState(graphics, mouseX, mouseY, deltaTicks);
 
         if (type == MacroType.COMMAND) {
-            drawLabel(graphics, text("macro.redstoneutils.alias"), layout.fieldX(), layout.bindingLabelY());
+            drawLabel(graphics, text("macro.redstoneutils.alias"), layout.bindingX(), layout.bindingLabelY());
             aliasBox.extractRenderState(graphics, mouseX, mouseY, deltaTicks);
-            graphics.text(font, Component.translatable("macro.redstoneutils.alias_hint"), layout.fieldX(), layout.bindingFieldY() + FIELD_HEIGHT + 7, RedstoneUi.MUTED_TEXT_COLOR, false);
+            if (layout.showHint()) {
+                RedstoneUi.drawFittedText(graphics, font, text("macro.redstoneutils.alias_hint"), layout.bindingX(),
+                        layout.hintY(), layout.columnWidth(), RedstoneUi.MUTED_TEXT_COLOR);
+            }
         } else {
-            drawLabel(graphics, text("macro.redstoneutils.binding"), layout.fieldX(), layout.bindingLabelY());
-            boolean hovered = RedstoneUi.contains(mouseX, mouseY, layout.fieldX(), layout.bindingFieldY(), layout.fieldWidth(), FIELD_HEIGHT);
+            drawLabel(graphics, text("macro.redstoneutils.binding"), layout.bindingX(), layout.bindingLabelY());
+            boolean hovered = RedstoneUi.contains(mouseX, mouseY, layout.bindingX(), layout.bindingFieldY(), layout.columnWidth(), FIELD_HEIGHT);
             String label = capturingKey ? text("macro.redstoneutils.capture") : MacroKeys.displayName(keyCode, mouseButton, modifiers);
-            RedstoneUi.drawButton(graphics, font, label, layout.fieldX(), layout.bindingFieldY(), layout.fieldWidth(), FIELD_HEIGHT, hovered, capturingKey ? RedstoneUi.ButtonTone.ACTIVE : RedstoneUi.ButtonTone.NORMAL);
-            graphics.text(font, Component.translatable("macro.redstoneutils.capture_hint"), layout.fieldX(), layout.bindingFieldY() + FIELD_HEIGHT + 7, RedstoneUi.MUTED_TEXT_COLOR, false);
+            RedstoneUi.drawButton(graphics, font, label, layout.bindingX(), layout.bindingFieldY(), layout.columnWidth(), FIELD_HEIGHT, hovered, capturingKey ? RedstoneUi.ButtonTone.ACTIVE : RedstoneUi.ButtonTone.NORMAL);
+            if (layout.showHint()) {
+                RedstoneUi.drawFittedText(graphics, font, text("macro.redstoneutils.capture_hint"), layout.bindingX(),
+                        layout.hintY(), layout.columnWidth(), RedstoneUi.MUTED_TEXT_COLOR);
+            }
         }
 
-        drawLabel(graphics, text("macro.redstoneutils.category"), layout.fieldX(), layout.categoryLabelY());
+        drawLabel(graphics, text("macro.redstoneutils.category"), layout.categoryX(), layout.categoryLabelY());
         categoryBox.extractRenderState(graphics, mouseX, mouseY, deltaTicks);
         if (type == MacroType.KEYBIND) {
-            boolean triggerHovered = RedstoneUi.contains(mouseX, mouseY, layout.fieldX(), layout.triggerY(), 160, BUTTON_HEIGHT);
-            RedstoneUi.drawButton(graphics, font, Component.translatable("macro.redstoneutils.trigger", text("enum.redstoneutils." + trigger.name().toLowerCase(java.util.Locale.ROOT))).getString(), layout.fieldX(), layout.triggerY(), 160, BUTTON_HEIGHT, triggerHovered, RedstoneUi.ButtonTone.NORMAL);
+            boolean triggerHovered = RedstoneUi.contains(mouseX, mouseY, layout.triggerX(), layout.triggerY(), layout.columnWidth(), BUTTON_HEIGHT);
+            RedstoneUi.drawButton(graphics, font, Component.translatable("macro.redstoneutils.trigger", text("enum.redstoneutils." + trigger.name().toLowerCase(java.util.Locale.ROOT))).getString(), layout.triggerX(), layout.triggerY(), layout.columnWidth(), BUTTON_HEIGHT, triggerHovered, RedstoneUi.ButtonTone.NORMAL);
         }
-        boolean enabledHovered = RedstoneUi.contains(mouseX, mouseY, layout.fieldX() + 170, layout.triggerY(), 140, BUTTON_HEIGHT);
-        RedstoneUi.drawButton(graphics, font, text(enabled ? "state.redstoneutils.enabled" : "state.redstoneutils.disabled"), layout.fieldX() + 170, layout.triggerY(), 140, BUTTON_HEIGHT, enabledHovered,
+        boolean enabledHovered = RedstoneUi.contains(mouseX, mouseY, layout.enabledX(), layout.triggerY(), layout.columnWidth(), BUTTON_HEIGHT);
+        RedstoneUi.drawButton(graphics, font, text(enabled ? "state.redstoneutils.enabled" : "state.redstoneutils.disabled"), layout.enabledX(), layout.triggerY(), layout.columnWidth(), BUTTON_HEIGHT, enabledHovered,
                 enabled ? RedstoneUi.ButtonTone.ACTIVE : RedstoneUi.ButtonTone.NORMAL);
     }
 
     private void drawFooter(GuiGraphicsExtractor graphics, Layout layout, int mouseX, int mouseY) {
-        boolean saveHovered = RedstoneUi.contains(mouseX, mouseY, layout.saveX(), layout.footerButtonY(), FOOTER_BUTTON_WIDTH, BUTTON_HEIGHT);
-        boolean cancelHovered = RedstoneUi.contains(mouseX, mouseY, layout.cancelX(), layout.footerButtonY(), FOOTER_BUTTON_WIDTH, BUTTON_HEIGHT);
-        boolean deleteHovered = editing && RedstoneUi.contains(mouseX, mouseY, layout.deleteX(), layout.footerButtonY(), FOOTER_BUTTON_WIDTH, BUTTON_HEIGHT);
+        boolean saveHovered = RedstoneUi.contains(mouseX, mouseY, layout.saveX(), layout.footerButtonY(), layout.footerButtonWidth(), BUTTON_HEIGHT);
+        boolean cancelHovered = RedstoneUi.contains(mouseX, mouseY, layout.cancelX(), layout.footerButtonY(), layout.footerButtonWidth(), BUTTON_HEIGHT);
+        boolean deleteHovered = editing && RedstoneUi.contains(mouseX, mouseY, layout.deleteX(), layout.footerButtonY(), layout.footerButtonWidth(), BUTTON_HEIGHT);
 
         if (editing) {
-            RedstoneUi.drawButton(graphics, font, text("macros.redstoneutils.delete"), layout.deleteX(), layout.footerButtonY(), FOOTER_BUTTON_WIDTH, BUTTON_HEIGHT, deleteHovered, RedstoneUi.ButtonTone.DANGER);
+            RedstoneUi.drawButton(graphics, font, text("macros.redstoneutils.delete"), layout.deleteX(), layout.footerButtonY(), layout.footerButtonWidth(), BUTTON_HEIGHT, deleteHovered, RedstoneUi.ButtonTone.DANGER);
         }
-        RedstoneUi.drawButton(graphics, font, text("gui.cancel"), layout.cancelX(), layout.footerButtonY(), FOOTER_BUTTON_WIDTH, BUTTON_HEIGHT, cancelHovered, RedstoneUi.ButtonTone.NORMAL);
-        RedstoneUi.drawButton(graphics, font, text("gui.save"), layout.saveX(), layout.footerButtonY(), FOOTER_BUTTON_WIDTH, BUTTON_HEIGHT, saveHovered, RedstoneUi.ButtonTone.ACTIVE);
+        RedstoneUi.drawButton(graphics, font, text("gui.cancel"), layout.cancelX(), layout.footerButtonY(), layout.footerButtonWidth(), BUTTON_HEIGHT, cancelHovered, RedstoneUi.ButtonTone.NORMAL);
+        RedstoneUi.drawButton(graphics, font, text("macro.redstoneutils.save"), layout.saveX(), layout.footerButtonY(), layout.footerButtonWidth(), BUTTON_HEIGHT, saveHovered, RedstoneUi.ButtonTone.ACTIVE);
     }
 
     private void drawLabel(GuiGraphicsExtractor graphics, String label, int x, int y) {
@@ -419,10 +424,10 @@ final class MacroEditScreen extends Screen {
     }
 
     private void positionFields(Layout layout) {
-        positionField(nameBox, layout.fieldX(), layout.nameFieldY(), layout.fieldWidth());
-        positionField(commandBox, layout.fieldX(), layout.commandFieldY(), layout.fieldWidth());
-        positionField(aliasBox, layout.fieldX(), layout.bindingFieldY(), layout.fieldWidth());
-        positionField(categoryBox, layout.fieldX(), layout.categoryFieldY(), layout.fieldWidth());
+        positionField(nameBox, layout.nameX(), layout.nameFieldY(), layout.columnWidth());
+        positionField(commandBox, layout.commandX(), layout.commandFieldY(), layout.columnWidth());
+        positionField(aliasBox, layout.bindingX(), layout.bindingFieldY(), layout.columnWidth());
+        positionField(categoryBox, layout.categoryX(), layout.categoryFieldY(), layout.columnWidth());
         updateFieldVisibility();
     }
 
@@ -455,8 +460,10 @@ final class MacroEditScreen extends Screen {
     }
 
     private static Layout layout(int screenWidth, int screenHeight) {
-        int width = Mth.clamp(screenWidth - 24, PANEL_MIN_WIDTH, PANEL_MAX_WIDTH);
-        int height = Mth.clamp(screenHeight - 24, PANEL_MIN_HEIGHT, PANEL_MAX_HEIGHT);
+        int width = Mth.clamp(screenWidth - 16, PANEL_MIN_WIDTH, PANEL_MAX_WIDTH);
+        width = Math.min(width, Math.max(1, screenWidth - 8));
+        int height = Mth.clamp(screenHeight - 16, PANEL_MIN_HEIGHT, PANEL_MAX_HEIGHT);
+        height = Math.min(height, Math.max(1, screenHeight - 8));
         int x = (screenWidth - width) / 2;
         int y = (screenHeight - height) / 2;
         return new Layout(x, y, width, height);
@@ -475,12 +482,16 @@ final class MacroEditScreen extends Screen {
             return x + RedstoneUi.PANEL_PADDING;
         }
 
-        private int fieldWidth() {
-            return width - RedstoneUi.PANEL_PADDING * 2;
+        private int columnWidth() {
+            return (width - RedstoneUi.PANEL_PADDING * 2 - RedstoneUi.GAP) / 2;
+        }
+
+        private int rightColumnX() {
+            return fieldX() + columnWidth() + RedstoneUi.GAP;
         }
 
         private int typeY() {
-            return y + 50;
+            return y + 48;
         }
 
         private int keybindTypeX() {
@@ -488,11 +499,15 @@ final class MacroEditScreen extends Screen {
         }
 
         private int commandTypeX() {
-            return keybindTypeX() + TYPE_BUTTON_WIDTH + RedstoneUi.GAP;
+            return keybindTypeX() + typeButtonWidth() + RedstoneUi.GAP;
+        }
+
+        private int typeButtonWidth() {
+            return columnWidth();
         }
 
         private int nameLabelY() {
-            return y + 86;
+            return y + 82;
         }
 
         private int nameFieldY() {
@@ -500,7 +515,7 @@ final class MacroEditScreen extends Screen {
         }
 
         private int commandLabelY() {
-            return nameFieldY() + FIELD_HEIGHT + 16;
+            return y + 126;
         }
 
         private int commandFieldY() {
@@ -508,7 +523,7 @@ final class MacroEditScreen extends Screen {
         }
 
         private int bindingLabelY() {
-            return commandFieldY() + FIELD_HEIGHT + 16;
+            return commandLabelY();
         }
 
         private int bindingFieldY() {
@@ -516,15 +531,26 @@ final class MacroEditScreen extends Screen {
         }
 
         private int categoryLabelY() {
-            return bindingFieldY() + FIELD_HEIGHT + 24;
+            return nameLabelY();
         }
 
         private int categoryFieldY() {
             return categoryLabelY() + 12;
         }
 
+        private int nameX() { return fieldX(); }
+        private int commandX() { return fieldX(); }
+        private int bindingX() { return rightColumnX(); }
+        private int categoryX() { return rightColumnX(); }
+        private int hintY() { return bindingFieldY() + FIELD_HEIGHT + 7; }
+        private boolean showHint() { return height >= 260; }
+        private int triggerX() { return fieldX(); }
+        private int enabledX() { return rightColumnX(); }
+
         private int triggerY() {
-            return categoryFieldY() + FIELD_HEIGHT + 14;
+            return showHint()
+                    ? y + 184
+                    : bindingFieldY() + FIELD_HEIGHT + 8;
         }
 
         private int footerButtonY() {
@@ -535,12 +561,17 @@ final class MacroEditScreen extends Screen {
             return fieldX();
         }
 
+        private int footerButtonWidth() {
+            return Math.min(FOOTER_BUTTON_WIDTH,
+                    (width - RedstoneUi.PANEL_PADDING * 2 - RedstoneUi.GAP * 2) / 3);
+        }
+
         private int saveX() {
-            return x + width - RedstoneUi.PANEL_PADDING - FOOTER_BUTTON_WIDTH;
+            return x + width - RedstoneUi.PANEL_PADDING - footerButtonWidth();
         }
 
         private int cancelX() {
-            return saveX() - RedstoneUi.GAP - FOOTER_BUTTON_WIDTH;
+            return saveX() - RedstoneUi.GAP - footerButtonWidth();
         }
     }
 }

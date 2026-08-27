@@ -4,20 +4,25 @@ import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.minecraft.commands.CommandBuildContext;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
+import net.minecraft.commands.arguments.coordinates.BlockPosArgument;
+import net.minecraft.commands.arguments.item.ItemArgument;
+import net.minecraft.commands.arguments.item.ItemInput;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Container;
-import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -35,7 +40,6 @@ import org.main.redstoneutils.server.clock.HopperClockInterval;
 import org.main.redstoneutils.server.clock.HopperClockManager;
 import org.main.redstoneutils.server.config.RedstoneUtilsServerConfig;
 import org.main.redstoneutils.server.config.RedstoneUtilsServerConfig.Tool;
-import org.main.redstoneutils.server.gamerule.RedstoneUtilsGameRules;
 import org.main.redstoneutils.server.history.ChangeHistory;
 import org.main.redstoneutils.server.signal.ComparatorSignal;
 import org.main.redstoneutils.server.signal.SignalBlockVariant;
@@ -49,6 +53,7 @@ public final class RedstoneUtilsCommands {
 
     private static final double DEFAULT_TELEPORT_RANGE = 100.0D;
     private static final double MIN_TELEPORT_RANGE = 10.0D;
+    private static final int MAX_CUSTOM_ITEM_NAME_LENGTH = 256;
     private static final String ARG_VISIBLE = "visible";
     private static final String CLIENT_CONFIG = "config";
     private static final String CLIENT_MACROS = "macros";
@@ -63,162 +68,208 @@ public final class RedstoneUtilsCommands {
 
     public static void init() {
         CommandRegistrationCallback.EVENT.register((dispatcher, buildContext, environment) -> {
-            dispatcher.register(Commands.literal("overlay")
-                    .executes(context -> sendClientAction(context.getSource(), CLIENT_ALL_OVERLAYS, -1))
-                    .then(Commands.literal("wire")
-                            .executes(context -> sendClientAction(context.getSource(), CLIENT_WIRE_OVERLAY, -1))
-                            .then(Commands.argument(ARG_VISIBLE, BoolArgumentType.bool())
-                                    .executes(context -> sendClientAction(
-                                            context.getSource(),
-                                            CLIENT_WIRE_OVERLAY,
-                                            booleanValue(context, ARG_VISIBLE)
-                                    ))))
-                    .then(Commands.literal("sculk")
-                            .executes(context -> sendClientAction(context.getSource(), CLIENT_SCULK_OVERLAY, -1))
-                            .then(Commands.argument(ARG_VISIBLE, BoolArgumentType.bool())
-                                    .executes(context -> sendClientAction(
-                                            context.getSource(),
-                                            CLIENT_SCULK_OVERLAY,
-                                            booleanValue(context, ARG_VISIBLE)
-                                    ))))
-                    .then(Commands.literal("bud")
-                            .executes(context -> sendClientAction(context.getSource(), CLIENT_BUD_OVERLAY, -1))
-                            .then(Commands.argument(ARG_VISIBLE, BoolArgumentType.bool())
-                                    .executes(context -> sendClientAction(
-                                            context.getSource(),
-                                            CLIENT_BUD_OVERLAY,
-                                            booleanValue(context, ARG_VISIBLE)
-                                    ))))
-                    .then(Commands.literal("all")
-                            .executes(context -> sendClientAction(context.getSource(), CLIENT_ALL_OVERLAYS, -1))
-                            .then(Commands.argument(ARG_VISIBLE, BoolArgumentType.bool())
-                                    .executes(context -> sendClientAction(
-                                            context.getSource(),
-                                            CLIENT_ALL_OVERLAYS,
-                                            booleanValue(context, ARG_VISIBLE)
-                                    ))))
-            );
+            dispatcher.register(overlayCommand());
 
-            dispatcher.register(Commands.literal("redstone_utils")
-                    .then(Commands.literal("toolbox")
-                            .executes(context -> sendClientAction(context.getSource(), CLIENT_TOOLBOX, -1)))
-                    .then(Commands.literal("config")
-                            .executes(context -> sendClientAction(context.getSource(), CLIENT_CONFIG, -1)))
-                    .then(Commands.literal("macros")
-                            .executes(context -> sendClientAction(context.getSource(), CLIENT_MACROS, -1)))
-                    .then(Commands.literal("autowire")
-                            .requires(RedstoneUtilsCommands::canUseAutoWire)
-                            .executes(RedstoneUtilsCommands::showAutoWire)
-                            .then(Commands.argument("mode", StringArgumentType.word())
-                                    .suggests(RedstoneUtilsCommands::suggestWireTypes)
-                                    .executes(RedstoneUtilsCommands::setAutoWire)))
-                    .then(Commands.literal("reset_autowire")
-                            .requires(RedstoneUtilsCommands::canUseAutoWire)
-                            .executes(RedstoneUtilsCommands::resetAutoWire))
-                    .then(Commands.literal("waterproof_redstone")
-                            .requires(RedstoneUtilsCommands::canManageGameRules)
-                            .executes(context -> showWaterproofRedstone(context.getSource()))
-                            .then(Commands.argument("enabled", BoolArgumentType.bool())
-                                    .executes(context -> setWaterproofRedstone(
-                                            context.getSource(),
-                                            BoolArgumentType.getBool(context, "enabled")
-                                    ))))
-                    .then(Commands.literal("tp")
-                            .requires(RedstoneUtilsCommands::canUseTeleport)
-                            .executes(context -> teleport(context.getSource(), DEFAULT_TELEPORT_RANGE))
-                            .then(Commands.argument("range", DoubleArgumentType.doubleArg(MIN_TELEPORT_RANGE, RedstoneUtilsServerConfig.maxTeleportRange()))
-                                    .executes(context -> teleport(context.getSource(), DoubleArgumentType.getDouble(context, "range")))))
-            );
-
-            dispatcher.register(Commands.literal("signal")
-                    .requires(RedstoneUtilsCommands::canUseSignalTools)
-                    .then(Commands.argument("strength", IntegerArgumentType.integer(ComparatorSignal.MIN, ComparatorSignal.MAX))
-                            .executes(context -> giveSignalStrength(
-                                    context.getSource(),
-                                    IntegerArgumentType.getInteger(context, "strength")
-                            ))
-                            .then(Commands.literal("optimal")
-                                    .executes(context -> giveOptimalSignalStrength(
-                                            context.getSource(),
-                                            IntegerArgumentType.getInteger(context, "strength")
-                                    )))
-                            .then(Commands.literal("block")
-                                    .executes(context -> showSignalBlockOptions(context.getSource()))
-                                    .then(Commands.argument("block", StringArgumentType.word())
-                                            .suggests(RedstoneUtilsCommands::suggestSignalBlocks)
-                                            .executes(context -> createSignalBlock(
-                                                    context.getSource(),
-                                                    IntegerArgumentType.getInteger(context, "strength"),
-                                                    StringArgumentType.getString(context, "block")
-                                            ))))
-                            .then(Commands.argument("block", StringArgumentType.word())
-                                    .suggests(RedstoneUtilsCommands::suggestSignalBlocks)
-                                    .executes(context -> createSignalBlock(
-                                            context.getSource(),
-                                            IntegerArgumentType.getInteger(context, "strength"),
-                                            StringArgumentType.getString(context, "block")
-                                    ))))
-            );
+            dispatcher.register(redstoneUtilsCommand());
+            dispatcher.register(macroCommand());
+            dispatcher.register(autoWireCommand());
+            dispatcher.register(signalCommand(buildContext));
 
             dispatcher.register(Commands.literal("set-content")
                     .requires(RedstoneUtilsCommands::canUseSignalTools)
-                    .then(Commands.argument("amount", IntegerArgumentType.integer(0, RedstoneUtilsServerConfig.maxContainerItems()))
-                            .executes(context -> setContent(
-                                    context.getSource(),
-                                    IntegerArgumentType.getInteger(context, "amount")
-                            )))
+                    .then(Commands.argument("pos", BlockPosArgument.blockPos())
+                            .then(Commands.argument("amount", IntegerArgumentType.integer(0, RedstoneUtilsServerConfig.maxContainerItems()))
+                                    .then(Commands.argument("item", ItemArgument.item(buildContext))
+                                            .executes(context -> setContent(context, ""))
+                                            .then(Commands.argument("name", StringArgumentType.string())
+                                                    .executes(context -> setContent(
+                                                            context,
+                                                            StringArgumentType.getString(context, "name")
+                                                    ))))))
             );
 
             dispatcher.register(Commands.literal("set-signal")
                     .requires(RedstoneUtilsCommands::canUseSignalTools)
-                    .then(Commands.argument("strength", IntegerArgumentType.integer(ComparatorSignal.MIN, ComparatorSignal.MAX))
-                            .executes(context -> setSignal(
-                                    context.getSource(),
-                                    IntegerArgumentType.getInteger(context, "strength")
-                            )))
+                    .then(Commands.argument("pos", BlockPosArgument.blockPos())
+                            .then(Commands.argument("strength", IntegerArgumentType.integer(ComparatorSignal.MIN, ComparatorSignal.MAX))
+                                    .then(Commands.argument("item", ItemArgument.item(buildContext))
+                                            .executes(context -> setSignal(context, ""))
+                                            .then(Commands.argument("name", StringArgumentType.string())
+                                                    .executes(context -> setSignal(
+                                                            context,
+                                                            StringArgumentType.getString(context, "name")
+                                                    ))))))
             );
 
-            dispatcher.register(Commands.literal("clock")
-                    .requires(RedstoneUtilsCommands::canUseBuilder)
-                    .executes(context -> showClockUsage(context.getSource()))
-                    .then(Commands.literal("undo")
-                            .requires(RedstoneUtilsCommands::canUseHistory)
-                            .executes(context -> undoClock(context.getSource())))
-                    .then(Commands.literal("comparator")
-                            .executes(context -> showClockUsage(context.getSource()))
-                            .then(Commands.argument("interval", StringArgumentType.word())
-                                    .executes(context -> createComparatorClock(
-                                            context.getSource(),
-                                            StringArgumentType.getString(context, "interval")
-                                    ))))
-                    .then(Commands.literal("hopper")
-                            .executes(context -> showClockUsage(context.getSource()))
-                            .then(Commands.argument("interval", StringArgumentType.word())
-                                    .executes(context -> createHopperClock(
-                                            context.getSource(),
-                                            StringArgumentType.getString(context, "interval")
-                                    ))))
-                    .then(Commands.argument("interval", StringArgumentType.word())
-                            .executes(context -> createComparatorClock(
-                                    context.getSource(),
-                                    StringArgumentType.getString(context, "interval")
-                            )))
-            );
+            dispatcher.register(clockCommand());
 
-            dispatcher.register(Commands.literal("redstone")
-                    .requires(RedstoneUtilsCommands::canUseHistory)
-                    .then(Commands.literal("undo")
-                            .executes(context -> applyHistoryResult(
-                                    context.getSource(),
-                                    ChangeHistory.undo(context.getSource().getPlayerOrException())
-                            )))
-                    .then(Commands.literal("redo")
-                            .executes(context -> applyHistoryResult(
-                                    context.getSource(),
-                                    ChangeHistory.redo(context.getSource().getPlayerOrException())
-                            )))
-            );
+            dispatcher.register(historyCommand());
+
+            dispatcher.register(Commands.literal("redstoneutils")
+                    .then(overlayCommand())
+                    .then(macroCommand())
+                    .then(autoWireCommand())
+                    .then(signalCommand(buildContext))
+                    .then(clockCommand())
+                    .then(historyCommand("history")));
         });
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> overlayCommand() {
+        return Commands.literal("overlay")
+                .executes(context -> sendClientAction(context.getSource(), CLIENT_ALL_OVERLAYS, -1))
+                .then(Commands.literal("wire")
+                        .executes(context -> sendClientAction(context.getSource(), CLIENT_WIRE_OVERLAY, -1))
+                        .then(Commands.argument(ARG_VISIBLE, BoolArgumentType.bool())
+                                .executes(context -> sendClientAction(context.getSource(), CLIENT_WIRE_OVERLAY, booleanValue(context, ARG_VISIBLE)))))
+                .then(Commands.literal("sculk")
+                        .executes(context -> sendClientAction(context.getSource(), CLIENT_SCULK_OVERLAY, -1))
+                        .then(Commands.argument(ARG_VISIBLE, BoolArgumentType.bool())
+                                .executes(context -> sendClientAction(context.getSource(), CLIENT_SCULK_OVERLAY, booleanValue(context, ARG_VISIBLE)))))
+                .then(Commands.literal("bud")
+                        .executes(context -> sendClientAction(context.getSource(), CLIENT_BUD_OVERLAY, -1))
+                        .then(Commands.argument(ARG_VISIBLE, BoolArgumentType.bool())
+                                .executes(context -> sendClientAction(context.getSource(), CLIENT_BUD_OVERLAY, booleanValue(context, ARG_VISIBLE)))))
+                .then(Commands.literal("all")
+                        .executes(context -> sendClientAction(context.getSource(), CLIENT_ALL_OVERLAYS, -1))
+                        .then(Commands.argument(ARG_VISIBLE, BoolArgumentType.bool())
+                                .executes(context -> sendClientAction(context.getSource(), CLIENT_ALL_OVERLAYS, booleanValue(context, ARG_VISIBLE)))));
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> macroCommand() {
+        return Commands.literal("macro")
+                .executes(context -> sendClientAction(context.getSource(), CLIENT_MACROS, -1));
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> clockCommand() {
+        return Commands.literal("clock")
+                .requires(RedstoneUtilsCommands::canUseBuilder)
+                .executes(context -> showClockUsage(context.getSource()))
+                .then(Commands.literal("undo")
+                        .requires(RedstoneUtilsCommands::canUseHistory)
+                        .executes(context -> undoClock(context.getSource())))
+                .then(Commands.literal("comparator")
+                        .executes(context -> showClockUsage(context.getSource()))
+                        .then(Commands.argument("interval", StringArgumentType.word())
+                                .executes(context -> createComparatorClock(context.getSource(), StringArgumentType.getString(context, "interval")))))
+                .then(Commands.literal("hopper")
+                        .executes(context -> showClockUsage(context.getSource()))
+                        .then(Commands.argument("interval", StringArgumentType.word())
+                                .executes(context -> createHopperClock(context.getSource(), StringArgumentType.getString(context, "interval")))))
+                .then(Commands.argument("interval", StringArgumentType.word())
+                        .executes(context -> createComparatorClock(context.getSource(), StringArgumentType.getString(context, "interval"))));
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> historyCommand() {
+        return historyCommand("redstone");
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> historyCommand(String name) {
+        return Commands.literal(name)
+                .requires(RedstoneUtilsCommands::canUseHistory)
+                .then(Commands.literal("undo")
+                        .executes(context -> applyHistoryResult(context.getSource(), ChangeHistory.undo(context.getSource().getPlayerOrException()))))
+                .then(Commands.literal("redo")
+                        .executes(context -> applyHistoryResult(context.getSource(), ChangeHistory.redo(context.getSource().getPlayerOrException()))));
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> redstoneUtilsCommand() {
+        return Commands.literal("redstoneutils")
+                .executes(context -> sendClientAction(context.getSource(), CLIENT_TOOLBOX, -1))
+                .then(Commands.literal("toolbox")
+                        .executes(context -> sendClientAction(context.getSource(), CLIENT_TOOLBOX, -1)))
+                .then(Commands.literal("config")
+                        .executes(context -> sendClientAction(context.getSource(), CLIENT_CONFIG, -1)))
+                .then(Commands.literal("teleport")
+                        .requires(RedstoneUtilsCommands::canUseTeleport)
+                        .executes(context -> teleport(context.getSource(), DEFAULT_TELEPORT_RANGE))
+                        .then(Commands.argument("range", DoubleArgumentType.doubleArg(MIN_TELEPORT_RANGE, RedstoneUtilsServerConfig.maxTeleportRange()))
+                                .executes(context -> teleport(context.getSource(), DoubleArgumentType.getDouble(context, "range")))));
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> autoWireCommand() {
+        return Commands.literal("autowire")
+                .requires(RedstoneUtilsCommands::canUseAutoWire)
+                .executes(RedstoneUtilsCommands::showAutoWire)
+                .then(Commands.argument("mode", StringArgumentType.word())
+                        .suggests(RedstoneUtilsCommands::suggestWireTypes)
+                        .executes(RedstoneUtilsCommands::setAutoWire));
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> signalCommand(CommandBuildContext buildContext) {
+        return Commands.literal("signal")
+                .requires(RedstoneUtilsCommands::canUseSignalTools)
+                .then(Commands.argument("strength", IntegerArgumentType.integer(ComparatorSignal.MIN, ComparatorSignal.MAX))
+                        .executes(context -> giveSignalStrength(
+                                context.getSource(),
+                                IntegerArgumentType.getInteger(context, "strength")
+                        ))
+                        .then(Commands.literal("optimal")
+                                .executes(context -> giveOptimalSignalStrength(
+                                        context.getSource(),
+                                        IntegerArgumentType.getInteger(context, "strength")
+                                )))
+                        .then(Commands.literal("block")
+                                .executes(context -> showSignalBlockOptions(context.getSource()))
+                                .then(Commands.argument("block", StringArgumentType.word())
+                                        .suggests(RedstoneUtilsCommands::suggestSignalBlocks)
+                                        .executes(context -> createSignalBlock(
+                                                context.getSource(),
+                                                IntegerArgumentType.getInteger(context, "strength"),
+                                                StringArgumentType.getString(context, "block")
+                                        ))))
+                        .then(Commands.argument("block", StringArgumentType.word())
+                                .suggests(RedstoneUtilsCommands::suggestSignalBlocks)
+                                .executes(context -> createSignalBlock(
+                                        context.getSource(),
+                                        IntegerArgumentType.getInteger(context, "strength"),
+                                        StringArgumentType.getString(context, "block")
+                                ))))
+                .then(Commands.literal("optimal")
+                        .then(Commands.argument("strength", IntegerArgumentType.integer(ComparatorSignal.MIN, ComparatorSignal.MAX))
+                                .executes(context -> giveOptimalSignalStrength(
+                                        context.getSource(),
+                                        IntegerArgumentType.getInteger(context, "strength")
+                                ))))
+                .then(Commands.literal("block")
+                        .executes(context -> showSignalBlockOptions(context.getSource()))
+                        .then(Commands.argument("block", StringArgumentType.word())
+                                .suggests(RedstoneUtilsCommands::suggestSignalBlocks)
+                                .then(Commands.argument("strength", IntegerArgumentType.integer(ComparatorSignal.MIN, ComparatorSignal.MAX))
+                                        .executes(context -> createSignalBlock(
+                                                context.getSource(),
+                                                IntegerArgumentType.getInteger(context, "strength"),
+                                                StringArgumentType.getString(context, "block")
+                                        )))))
+                .then(Commands.literal("container")
+                        .then(signalContainerContentCommand(buildContext))
+                        .then(signalContainerStrengthCommand(buildContext)));
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> signalContainerContentCommand(CommandBuildContext buildContext) {
+        return Commands.literal("content")
+                .then(Commands.argument("pos", BlockPosArgument.blockPos())
+                        .then(Commands.argument("amount", IntegerArgumentType.integer(0, RedstoneUtilsServerConfig.maxContainerItems()))
+                                .then(Commands.argument("item", ItemArgument.item(buildContext))
+                                        .executes(context -> setContent(context, ""))
+                                        .then(Commands.argument("name", StringArgumentType.string())
+                                                .executes(context -> setContent(
+                                                        context,
+                                                        StringArgumentType.getString(context, "name")
+                                                ))))));
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> signalContainerStrengthCommand(CommandBuildContext buildContext) {
+        return Commands.literal("strength")
+                .then(Commands.argument("pos", BlockPosArgument.blockPos())
+                        .then(Commands.argument("strength", IntegerArgumentType.integer(ComparatorSignal.MIN, ComparatorSignal.MAX))
+                                .then(Commands.argument("item", ItemArgument.item(buildContext))
+                                        .executes(context -> setSignal(context, ""))
+                                        .then(Commands.argument("name", StringArgumentType.string())
+                                                .executes(context -> setSignal(
+                                                        context,
+                                                        StringArgumentType.getString(context, "name")
+                                                ))))));
     }
 
     /** Compatibility check for code that does not yet specify a tool. */
@@ -246,15 +297,6 @@ public final class RedstoneUtilsCommands {
         return RedstoneUtilsServerConfig.canUse(Tool.HISTORY, source);
     }
 
-    private static boolean canManageGameRules(CommandSourceStack source) {
-        if (source.getEntity() == null || Commands.hasPermission(Commands.LEVEL_GAMEMASTERS).test(source)) {
-            return true;
-        }
-
-        ServerPlayer player = source.getPlayer();
-        return player != null && player.getAbilities().instabuild;
-    }
-
     private static int sendClientAction(CommandSourceStack source, String action, int value) throws CommandSyntaxException {
         ServerPlayer player = source.getPlayerOrException();
         if (!ServerPlayNetworking.canSend(player, RedstoneUtilsNetworking.ClientCommandPayload.TYPE)) {
@@ -280,6 +322,7 @@ public final class RedstoneUtilsCommands {
     private static int setAutoWire(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         ServerPlayer player = context.getSource().getPlayerOrException();
         String mode = StringArgumentType.getString(context, "mode");
+        if ("reset".equalsIgnoreCase(mode)) return resetAutoWire(context);
         WireType wireType = WireType.find(mode).orElse(null);
         if (wireType == null) {
             context.getSource().sendFailure(Component.translatable("message.redstoneutils.autowire.unknown", WireType.suggestions()));
@@ -297,32 +340,11 @@ public final class RedstoneUtilsCommands {
         return 1;
     }
 
-    private static int showWaterproofRedstone(CommandSourceStack source) {
-        boolean enabled = source.getLevel().getGameRules().get(RedstoneUtilsGameRules.WATERPROOF_REDSTONE);
-        source.sendSuccess(() -> Component.translatable(
-                "message.redstoneutils.waterproof_redstone.query",
-                Component.translatable(enabled ? "state.redstoneutils.on" : "state.redstoneutils.off")
-        ), false);
-        return enabled ? 1 : 0;
-    }
-
-    private static int setWaterproofRedstone(CommandSourceStack source, boolean enabled) {
-        source.getLevel().getGameRules().set(
-                RedstoneUtilsGameRules.WATERPROOF_REDSTONE,
-                enabled,
-                source.getServer()
-        );
-        source.sendSuccess(() -> Component.translatable(
-                "message.redstoneutils.waterproof_redstone.set",
-                Component.translatable(enabled ? "state.redstoneutils.on" : "state.redstoneutils.off")
-        ), true);
-        return enabled ? 1 : 0;
-    }
-
     private static CompletableFuture<Suggestions> suggestWireTypes(CommandContext<CommandSourceStack> context, SuggestionsBuilder builder) {
         for (WireType wireType : WireType.values()) {
             builder.suggest(wireType.key());
         }
+        builder.suggest("reset");
         return builder.buildFuture();
     }
 
@@ -479,24 +501,66 @@ public final class RedstoneUtilsCommands {
         return 1;
     }
 
-    private static int setContent(CommandSourceStack source, int amount) throws CommandSyntaxException {
-        return setContainerContent(source, amount, Component.translatable("message.redstoneutils.signal.set_content", amount));
+    private static int setContent(
+            CommandContext<CommandSourceStack> context,
+            String customName
+    ) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        BlockPos blockPos = BlockPosArgument.getLoadedBlockPos(context, "pos");
+        int amount = IntegerArgumentType.getInteger(context, "amount");
+        ItemStack itemStack = containerItem(
+                source,
+                ItemArgument.getItem(context, "item"),
+                customName
+        ).orElse(null);
+        if (itemStack == null) return 0;
+
+        TargetedContainer target = resolveContainerAt(source, blockPos, itemStack).orElse(null);
+        if (target == null) return 0;
+        int actualAmount = clampToCapacity(target, amount);
+        return setContainerContent(source, target, actualAmount, Component.translatable(
+                "message.redstoneutils.signal.set_content",
+                blockPos.getX(),
+                blockPos.getY(),
+                blockPos.getZ(),
+                actualAmount,
+                itemStack.getHoverName()
+        ));
     }
 
-    private static int setSignal(CommandSourceStack source, int strength) throws CommandSyntaxException {
-        TargetedContainer target = resolveTargetedContainer(source, strength > 0).orElse(null);
+    private static int setSignal(
+            CommandContext<CommandSourceStack> context,
+            String customName
+    ) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        BlockPos blockPos = BlockPosArgument.getLoadedBlockPos(context, "pos");
+        int strength = IntegerArgumentType.getInteger(context, "strength");
+        ItemStack itemStack = containerItem(
+                source,
+                ItemArgument.getItem(context, "item"),
+                customName
+        ).orElse(null);
+        if (itemStack == null) return 0;
+
+        TargetedContainer target = resolveContainerAt(source, blockPos, itemStack).orElse(null);
         if (target == null) return 0;
 
-        int slotMaxStackSize = slotMaxStackSize(target.container(), target.heldStack());
+        int slotMaxStackSize = slotMaxStackSize(target.container(), target.itemStack());
         int amount = ComparatorSignal.amountForSignal(strength, target.container().getContainerSize(), slotMaxStackSize);
-        return setContainerContent(source, target, amount, Component.translatable("message.redstoneutils.signal.set_signal", strength, amount));
-    }
-
-    private static int setContainerContent(CommandSourceStack source, int amount, Component feedback) throws CommandSyntaxException {
-        TargetedContainer target = resolveTargetedContainer(source, amount > 0).orElse(null);
-        if (target == null) return 0;
-
-        return setContainerContent(source, target, amount, feedback);
+        return setContainerContent(
+                source,
+                target,
+                amount,
+                Component.translatable(
+                        "message.redstoneutils.signal.set_signal",
+                        blockPos.getX(),
+                        blockPos.getY(),
+                        blockPos.getZ(),
+                        strength,
+                        amount,
+                        itemStack.getHoverName()
+                )
+        );
     }
 
     private static int setContainerContent(CommandSourceStack source, TargetedContainer target, int amount, Component feedback) {
@@ -512,11 +576,11 @@ public final class RedstoneUtilsCommands {
         transaction.capture(target.level(), target.blockPos());
         target.container().clearContent();
 
-        int remaining = amount;
-        int slotMaxStackSize = slotMaxStackSize(target.container(), target.heldStack());
+        int remaining = clampToCapacity(target, amount);
+        int slotMaxStackSize = slotMaxStackSize(target.container(), target.itemStack());
         for (int slot = 0; slot < target.container().getContainerSize() && remaining > 0 && slotMaxStackSize > 0; slot++) {
             int stackSize = Math.min(remaining, slotMaxStackSize);
-            target.container().setItem(slot, target.heldStack().copyWithCount(stackSize));
+            target.container().setItem(slot, target.itemStack().copyWithCount(stackSize));
             remaining -= stackSize;
         }
 
@@ -530,29 +594,72 @@ public final class RedstoneUtilsCommands {
         return 1;
     }
 
-    private static Optional<TargetedContainer> resolveTargetedContainer(CommandSourceStack source, boolean requiresHeldItem) throws CommandSyntaxException {
+    private static int clampToCapacity(TargetedContainer target, int amount) {
+        int slotMaximum = slotMaxStackSize(target.container(), target.itemStack());
+        long capacity = (long) target.container().getContainerSize() * slotMaximum;
+        return (int) Math.min(Math.max(0L, amount), Math.min(Integer.MAX_VALUE, capacity));
+    }
+
+    private static Optional<TargetedContainer> resolveContainerAt(
+            CommandSourceStack source,
+            BlockPos blockPos,
+            ItemStack itemStack
+    ) throws CommandSyntaxException {
         ServerPlayer player = source.getPlayerOrException();
         ServerLevel level = player.level();
-        BlockHitResult hitResult = targetedBlock(player, RedstoneUtilsServerConfig.maxTargetRange()).orElse(null);
-        if (hitResult == null) {
-            source.sendFailure(Component.translatable("message.redstoneutils.look_at_container"));
+
+        double maxRange = RedstoneUtilsServerConfig.maxTargetRange();
+        if (player.getEyePosition().distanceToSqr(Vec3.atCenterOf(blockPos)) > maxRange * maxRange) {
+            source.sendFailure(Component.translatable(
+                    "message.redstoneutils.container_out_of_range",
+                    blockPos.getX(),
+                    blockPos.getY(),
+                    blockPos.getZ(),
+                    maxRange
+            ));
             return Optional.empty();
         }
 
-        ItemStack heldStack = player.getItemInHand(InteractionHand.MAIN_HAND);
-        if (requiresHeldItem && heldStack.isEmpty()) {
-            source.sendFailure(Component.translatable("message.redstoneutils.hold_item"));
-            return Optional.empty();
-        }
-
-        BlockPos blockPos = hitResult.getBlockPos();
         BlockEntity blockEntity = level.getBlockEntity(blockPos);
         if (!(blockEntity instanceof Container container)) {
             source.sendFailure(Component.translatable("message.redstoneutils.not_container"));
             return Optional.empty();
         }
 
-        return Optional.of(new TargetedContainer(level, blockPos, level.getBlockState(blockPos), blockEntity, container, heldStack));
+        return Optional.of(new TargetedContainer(
+                level,
+                blockPos,
+                level.getBlockState(blockPos),
+                blockEntity,
+                container,
+                itemStack
+        ));
+    }
+
+    private static Optional<ItemStack> containerItem(
+            CommandSourceStack source,
+            ItemInput itemInput,
+            String customName
+    ) throws CommandSyntaxException {
+        if (customName.length() > MAX_CUSTOM_ITEM_NAME_LENGTH) {
+            source.sendFailure(Component.translatable(
+                    "message.redstoneutils.item_name_too_long",
+                    MAX_CUSTOM_ITEM_NAME_LENGTH
+            ));
+            return Optional.empty();
+        }
+
+        ItemStack itemStack = itemInput.createItemStack(1);
+        if (itemStack.isEmpty()) {
+            source.sendFailure(Component.translatable(
+                    "message.redstoneutils.invalid_container_item"
+            ));
+            return Optional.empty();
+        }
+        if (!customName.isBlank()) {
+            itemStack.set(DataComponents.CUSTOM_NAME, Component.literal(customName));
+        }
+        return Optional.of(itemStack);
     }
 
     private static int slotMaxStackSize(Container container, ItemStack itemStack) {
@@ -627,7 +734,7 @@ public final class RedstoneUtilsCommands {
             BlockState blockState,
             BlockEntity blockEntity,
             Container container,
-            ItemStack heldStack
+            ItemStack itemStack
     ) {
     }
 }

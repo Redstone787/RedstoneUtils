@@ -25,6 +25,7 @@ final class NumericConfigScreen extends Screen {
     private double value;
     private EditBox valueBox;
     private boolean dragging;
+    private boolean valid = true;
 
     NumericConfigScreen(Component title, double minimum, double maximum, int decimals, double value,
                         Consumer<Double> setter, Screen parent) {
@@ -64,7 +65,7 @@ final class NumericConfigScreen extends Screen {
         RedstoneUi.drawButton(graphics, font, Component.translatable("gui.cancel").getString(), x + 24, y + 119, 88, 24,
                 RedstoneUi.contains(mouseX, mouseY, x + 24, y + 119, 88, 24), RedstoneUi.ButtonTone.NORMAL);
         RedstoneUi.drawButton(graphics, font, Component.translatable("gui.done").getString(), x + 128, y + 119, 88, 24,
-                RedstoneUi.contains(mouseX, mouseY, x + 128, y + 119, 88, 24), RedstoneUi.ButtonTone.ACTIVE);
+                RedstoneUi.contains(mouseX, mouseY, x + 128, y + 119, 88, 24), valid ? RedstoneUi.ButtonTone.ACTIVE : RedstoneUi.ButtonTone.DISABLED);
     }
 
     @Override
@@ -81,7 +82,7 @@ final class NumericConfigScreen extends Screen {
             minecraft.gui.setScreen(parent);
             return true;
         }
-        if (RedstoneUi.contains(event.x(), event.y(), x + 128, y + 119, 88, 24)) {
+        if (valid && RedstoneUi.contains(event.x(), event.y(), x + 128, y + 119, 88, 24)) {
             saveAndClose();
             return true;
         }
@@ -94,7 +95,7 @@ final class NumericConfigScreen extends Screen {
 
     @Override
     public boolean keyPressed(KeyEvent event) {
-        if (event.key() == InputConstants.KEY_RETURN) { saveAndClose(); return true; }
+        if (event.key() == InputConstants.KEY_RETURN && valid) { saveAndClose(); return true; }
         if (event.key() == InputConstants.KEY_ESCAPE) { minecraft.gui.setScreen(parent); return true; }
         return valueBox.keyPressed(event);
     }
@@ -102,8 +103,16 @@ final class NumericConfigScreen extends Screen {
     @Override public boolean isPauseScreen() { return false; }
 
     private void parse(String text) {
-        try { value = Mth.clamp(Double.parseDouble(text.replace(',', '.')), minimum, maximum); }
-        catch (NumberFormatException ignored) { }
+        try {
+            double parsed = Double.parseDouble(text.replace(',', '.'));
+            if (!Double.isFinite(parsed)) throw new NumberFormatException("Non-finite number");
+            value = Mth.clamp(parsed, minimum, maximum);
+            valid = true;
+            if (valueBox != null) valueBox.setTextColor(RedstoneUi.TEXT_COLOR);
+        } catch (NumberFormatException ignored) {
+            valid = false;
+            if (valueBox != null) valueBox.setTextColor(RedstoneUi.ERROR_TEXT_COLOR);
+        }
     }
 
     private void setFromMouse(double mouseX, int x, int sliderWidth) {
@@ -111,11 +120,14 @@ final class NumericConfigScreen extends Screen {
         double raw = minimum + (maximum - minimum) * progress;
         double factor = Math.pow(10, decimals);
         value = Math.round(raw * factor) / factor;
+        valid = true;
+        valueBox.setTextColor(RedstoneUi.TEXT_COLOR);
         valueBox.setValue(format(value));
     }
 
     private void saveAndClose() {
         parse(valueBox.getValue());
+        if (!valid) return;
         setter.accept(value);
         minecraft.gui.setScreen(parent);
     }

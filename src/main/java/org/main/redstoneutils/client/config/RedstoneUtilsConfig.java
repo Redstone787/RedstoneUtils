@@ -26,6 +26,7 @@ public final class RedstoneUtilsConfig {
     private static String activeProfile = GLOBAL_PROFILE;
     private static Path recoveryBackup;
     private static boolean loaded;
+    private static boolean skipPreviousBackup;
 
     private RedstoneUtilsConfig() {
     }
@@ -41,9 +42,10 @@ public final class RedstoneUtilsConfig {
                 if (loadedData == null) throw new IOException("Empty client config");
                 data = loadedData;
             } catch (IOException | RuntimeException exception) {
-                recoveryBackup = backup(path);
-                data = new ConfigData();
-                RedstoneUtils.LOGGER.error("Could not read {}; defaults will be used", path, exception);
+                recoveryBackup = preserveDamaged(path);
+                data = loadLastValidBackup(path);
+                skipPreviousBackup = true;
+                RedstoneUtils.LOGGER.error("Could not read {}; the last valid backup or defaults will be used", path, exception);
             }
         }
 
@@ -60,8 +62,10 @@ public final class RedstoneUtilsConfig {
             try (Writer writer = Files.newBufferedWriter(temporary)) {
                 GSON.toJson(data, writer);
             }
+            preservePreviousValid(path);
             moveAtomically(temporary, path);
-        } catch (IOException exception) {
+            skipPreviousBackup = false;
+        } catch (IOException | RuntimeException exception) {
             RedstoneUtils.LOGGER.error("Could not save RedstoneUtils client config", exception);
         }
     }
@@ -78,7 +82,7 @@ public final class RedstoneUtilsConfig {
 
     public static synchronized void activateProfile(String profileKey) {
         load();
-        activeProfile = sanitizeProfileKey(profileKey);
+        activeProfile = normalizeProfileKey(profileKey);
         data.profiles.computeIfAbsent(activeProfile, ignored -> currentGlobalProfile().copy());
         sanitizeProfile(currentProfile());
         save();
@@ -116,11 +120,11 @@ public final class RedstoneUtilsConfig {
     public static RedstoneMessages.MessageTarget getMessageTarget() { return data.messageTarget; }
     public static void setMessageTarget(RedstoneMessages.MessageTarget value) { data.messageTarget = value == null ? RedstoneMessages.MessageTarget.POPUP : value; save(); }
     public static double getTeleportMaxRange() { return data.teleportMaxRange; }
-    public static void setTeleportMaxRange(double value) { data.teleportMaxRange = Math.clamp(value, 10.0D, 1_000.0D); save(); }
+    public static void setTeleportMaxRange(double value) { data.teleportMaxRange = Math.clamp(finite(value, 100.0D), 10.0D, 1_000.0D); save(); }
     public static int getSculkSensorSearchDistance() { return data.sculkSensorSearchDistance; }
     public static void setSculkSensorSearchDistance(int value) { data.sculkSensorSearchDistance = Math.clamp(value, 16, 256); save(); }
     public static int getSculkRebuildIntervalTicks() { return data.sculkRebuildIntervalTicks; }
-    public static void setSculkRebuildIntervalTicks(int value) { data.sculkRebuildIntervalTicks = Math.clamp(value, 1, 100); save(); }
+    public static void setSculkRebuildIntervalTicks(int value) { data.sculkRebuildIntervalTicks = Math.clamp(value, 5, 100); save(); }
 
     public static boolean isStatusHudVisible() { return data.statusHudVisible; }
     public static void setStatusHudVisible(boolean value) { data.statusHudVisible = value; save(); }
@@ -131,9 +135,9 @@ public final class RedstoneUtilsConfig {
     public static int getPopupDurationMillis() { return data.popupDurationMillis; }
     public static void setPopupDurationMillis(int value) { data.popupDurationMillis = Math.clamp(value, 1_000, 15_000); save(); }
     public static float getOverlayOpacity() { return data.overlayOpacity; }
-    public static void setOverlayOpacity(float value) { data.overlayOpacity = Math.clamp(value, 0.1F, 1.0F); save(); }
+    public static void setOverlayOpacity(float value) { data.overlayOpacity = Math.clamp(finite(value, 0.85F), 0.1F, 1.0F); save(); }
     public static float getOverlayLineWidth() { return data.overlayLineWidth; }
-    public static void setOverlayLineWidth(float value) { data.overlayLineWidth = Math.clamp(value, 1.0F, 8.0F); save(); }
+    public static void setOverlayLineWidth(float value) { data.overlayLineWidth = Math.clamp(finite(value, 2.0F), 1.0F, 8.0F); save(); }
     public static boolean renderOverlaysThroughWalls() { return data.overlayThroughWalls; }
     public static void setOverlayThroughWalls(boolean value) { data.overlayThroughWalls = value; save(); }
     public static int getOverlayMaxDistance() { return data.overlayMaxDistance; }
@@ -209,13 +213,13 @@ public final class RedstoneUtilsConfig {
         if (data.statusHudAnchor == null) data.statusHudAnchor = HudAnchor.TOP_RIGHT;
         if (data.popupAnchor == null) data.popupAnchor = PopupAnchor.TOP_LEFT;
         if (data.colorPalette == null) data.colorPalette = ColorPalette.DEFAULT;
-        data.teleportMaxRange = Math.clamp(data.teleportMaxRange, 10.0D, 1_000.0D);
+        data.teleportMaxRange = Math.clamp(finite(data.teleportMaxRange, 100.0D), 10.0D, 1_000.0D);
         data.sculkSensorSearchDistance = Math.clamp(data.sculkSensorSearchDistance, 16, 256);
-        data.sculkRebuildIntervalTicks = Math.clamp(data.sculkRebuildIntervalTicks, 1, 100);
+        data.sculkRebuildIntervalTicks = Math.clamp(data.sculkRebuildIntervalTicks, 5, 100);
         data.budTestRange = Math.clamp(data.budTestRange, 4, 64);
         data.popupDurationMillis = Math.clamp(data.popupDurationMillis, 1_000, 15_000);
-        data.overlayOpacity = Math.clamp(data.overlayOpacity, 0.1F, 1.0F);
-        data.overlayLineWidth = Math.clamp(data.overlayLineWidth, 1.0F, 8.0F);
+        data.overlayOpacity = Math.clamp(finite(data.overlayOpacity, 0.85F), 0.1F, 1.0F);
+        data.overlayLineWidth = Math.clamp(finite(data.overlayLineWidth, 2.0F), 1.0F, 8.0F);
         data.overlayMaxDistance = Math.clamp(data.overlayMaxDistance, 8, 256);
     }
 
@@ -223,13 +227,33 @@ public final class RedstoneUtilsConfig {
         if (profile.activeWireType == null) profile.activeWireType = WireType.NONE;
     }
 
-    private static String sanitizeProfileKey(String value) {
+    private static double finite(double value, double fallback) {
+        return Double.isFinite(value) ? value : fallback;
+    }
+
+    private static float finite(float value, float fallback) {
+        return Float.isFinite(value) ? value : fallback;
+    }
+
+    public static String normalizeProfileKey(String value) {
         String key = value == null ? "" : value.strip();
         return key.isEmpty() ? GLOBAL_PROFILE : key.substring(0, Math.min(key.length(), 256));
     }
 
-    private static Path backup(Path path) {
-        Path backup = path.resolveSibling(path.getFileName() + ".bak");
+    private static ConfigData loadLastValidBackup(Path path) {
+        Path backup = validBackup(path);
+        if (!Files.exists(backup)) return new ConfigData();
+        try (Reader reader = Files.newBufferedReader(backup)) {
+            ConfigData restored = GSON.fromJson(reader, ConfigData.class);
+            return restored == null ? new ConfigData() : restored;
+        } catch (IOException | RuntimeException exception) {
+            RedstoneUtils.LOGGER.error("Could not read last valid client config backup {}", backup, exception);
+            return new ConfigData();
+        }
+    }
+
+    private static Path preserveDamaged(Path path) {
+        Path backup = path.resolveSibling(path.getFileName() + ".corrupt-" + System.currentTimeMillis() + ".bak");
         try {
             Files.copy(path, backup, StandardCopyOption.REPLACE_EXISTING);
             return backup;
@@ -237,6 +261,19 @@ public final class RedstoneUtilsConfig {
             RedstoneUtils.LOGGER.error("Could not back up damaged client config {}", path, exception);
             return null;
         }
+    }
+
+    private static void preservePreviousValid(Path path) {
+        if (skipPreviousBackup || !Files.exists(path)) return;
+        try {
+            Files.copy(path, validBackup(path), StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException exception) {
+            RedstoneUtils.LOGGER.error("Could not update last valid client config backup", exception);
+        }
+    }
+
+    private static Path validBackup(Path path) {
+        return path.resolveSibling(path.getFileName() + ".bak");
     }
 
     private static void moveAtomically(Path source, Path target) throws IOException {
@@ -281,7 +318,7 @@ public final class RedstoneUtilsConfig {
         private RedstoneMessages.MessageTarget messageTarget = RedstoneMessages.MessageTarget.POPUP;
         private double teleportMaxRange = 100.0D;
         private int sculkSensorSearchDistance = 96;
-        private int sculkRebuildIntervalTicks = 5;
+        private int sculkRebuildIntervalTicks = 20;
         private int budTestRange = 8;
         private boolean statusHudVisible = true;
         private HudAnchor statusHudAnchor = HudAnchor.TOP_RIGHT;
@@ -289,7 +326,7 @@ public final class RedstoneUtilsConfig {
         private int popupDurationMillis = 3_000;
         private float overlayOpacity = 0.85F;
         private float overlayLineWidth = 2.0F;
-        private boolean overlayThroughWalls = true;
+        private boolean overlayThroughWalls = false;
         private int overlayMaxDistance = 128;
         private ColorPalette colorPalette = ColorPalette.DEFAULT;
         private Integer customWireColor;

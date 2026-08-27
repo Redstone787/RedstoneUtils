@@ -305,7 +305,9 @@ final class CalculatorScreen extends Screen {
             error = "";
             justEvaluated = true;
         } catch (IllegalArgumentException exception) {
-            error = Component.translatable("calculator.redstoneutils.error.invalid").getString();
+            error = exception.getMessage() == null || exception.getMessage().isBlank()
+                    ? Component.translatable("calculator.redstoneutils.error.invalid").getString()
+                    : exception.getMessage();
             justEvaluated = false;
         }
     }

@@ -1,5 +1,6 @@
 package org.main.redstoneutils.server.history;
 
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -21,14 +22,22 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.WeakHashMap;
 
 /** Shared, per-player block and block-entity undo/redo history. */
 public final class ChangeHistory {
 
     private static final int SET_BLOCK_FLAGS = Block.UPDATE_ALL | Block.UPDATE_SUPPRESS_DROPS;
-    private static final Map<UUID, PlayerHistory> HISTORIES = new LinkedHashMap<>();
+    private static final Map<MinecraftServer, Map<UUID, PlayerHistory>> HISTORIES = new WeakHashMap<>();
+    private static boolean initialized;
 
     private ChangeHistory() {
+    }
+
+    public static void init() {
+        if (initialized) return;
+        initialized = true;
+        ServerLifecycleEvents.SERVER_STOPPED.register(HISTORIES::remove);
     }
 
     public static Transaction begin(ServerPlayer player, Component description) {
@@ -38,13 +47,14 @@ public final class ChangeHistory {
     }
 
     public static Result undo(ServerPlayer player) {
-        PlayerHistory history = HISTORIES.get(player.getUUID());
+        MinecraftServer server = player.level().getServer();
+        PlayerHistory history = historiesFor(server).get(player.getUUID());
         if (history == null || history.undo.isEmpty()) {
             return Result.failure(Component.translatable("history.redstoneutils.undo.empty"));
         }
 
         ChangeSet changeSet = history.undo.peekFirst();
-        Result restored = restore(player.level().getServer(), changeSet.before());
+        Result restored = restore(server, changeSet.before());
         if (!restored.successful()) return restored;
 
         history.undo.removeFirst();
@@ -57,13 +67,14 @@ public final class ChangeHistory {
     }
 
     public static Result redo(ServerPlayer player) {
-        PlayerHistory history = HISTORIES.get(player.getUUID());
+        MinecraftServer server = player.level().getServer();
+        PlayerHistory history = historiesFor(server).get(player.getUUID());
         if (history == null || history.redo.isEmpty()) {
             return Result.failure(Component.translatable("history.redstoneutils.redo.empty"));
         }
 
         ChangeSet changeSet = history.redo.peekFirst();
-        Result restored = restore(player.level().getServer(), changeSet.after());
+        Result restored = restore(server, changeSet.after());
         if (!restored.successful()) return restored;
 
         history.redo.removeFirst();
@@ -76,8 +87,14 @@ public final class ChangeHistory {
         ));
     }
 
-    private static void remember(UUID playerId, ChangeSet changeSet) {
-        PlayerHistory history = HISTORIES.computeIfAbsent(playerId, ignored -> new PlayerHistory());
+    private static Map<UUID, PlayerHistory> historiesFor(MinecraftServer server) {
+        if (server == null) return Map.of();
+        return HISTORIES.computeIfAbsent(server, ignored -> new LinkedHashMap<>());
+    }
+
+    private static void remember(MinecraftServer server, UUID playerId, ChangeSet changeSet) {
+        if (server == null) return;
+        PlayerHistory history = historiesFor(server).computeIfAbsent(playerId, ignored -> new PlayerHistory());
         history.undo.addFirst(changeSet);
         history.redo.clear();
         trim(history.undo);
@@ -101,11 +118,27 @@ public final class ChangeHistory {
                         savedBlock.dimension().identifier().toString()
                 ));
             }
+            if (!level.isInWorldBounds(savedBlock.blockPos())) {
+                return Result.failure(Component.translatable("history.redstoneutils.restore_failed"));
+            }
         }
 
+        List<SavedBlock> rollback = blocks.stream()
+                .map(savedBlock -> capture(server.getLevel(savedBlock.dimension()), savedBlock.blockPos()))
+                .toList();
+        if (!apply(server, blocks)) {
+            apply(server, rollback);
+            return Result.failure(Component.translatable("history.redstoneutils.restore_failed"));
+        }
+        return Result.success(Component.empty());
+    }
+
+    private static boolean apply(MinecraftServer server, List<SavedBlock> blocks) {
         for (SavedBlock savedBlock : blocks) {
             ServerLevel level = server.getLevel(savedBlock.dimension());
-            level.setBlock(savedBlock.blockPos(), savedBlock.blockState(), SET_BLOCK_FLAGS);
+            if (level == null || !level.setBlock(savedBlock.blockPos(), savedBlock.blockState(), SET_BLOCK_FLAGS)) {
+                return false;
+            }
         }
 
         for (SavedBlock savedBlock : blocks) {
@@ -117,10 +150,9 @@ public final class ChangeHistory {
                     savedBlock.blockEntityTag().copy(),
                     level.registryAccess()
             );
-            if (blockEntity != null) {
-                level.setBlockEntity(blockEntity);
-                blockEntity.setChanged();
-            }
+            if (blockEntity == null) return false;
+            level.setBlockEntity(blockEntity);
+            blockEntity.setChanged();
         }
 
         for (SavedBlock savedBlock : blocks) {
@@ -129,7 +161,7 @@ public final class ChangeHistory {
             level.updateNeighborsAt(savedBlock.blockPos(), state.getBlock());
             level.sendBlockUpdated(savedBlock.blockPos(), state, state, Block.UPDATE_ALL);
         }
-        return Result.success(Component.empty());
+        return true;
     }
 
     private static SavedBlock capture(ServerLevel level, BlockPos blockPos) {
@@ -175,7 +207,7 @@ public final class ChangeHistory {
             }
             if (previous.isEmpty()) return false;
 
-            remember(player.getUUID(), new ChangeSet(description.copy(), List.copyOf(previous), List.copyOf(current)));
+            remember(server, player.getUUID(), new ChangeSet(description.copy(), List.copyOf(previous), List.copyOf(current)));
             return true;
         }
 

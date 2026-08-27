@@ -1,8 +1,12 @@
 package org.main.redstoneutils.client;
 
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.game.ServerboundChatCommandPacket;
 import org.main.redstoneutils.client.autowire.WireType;
+import org.main.redstoneutils.client.autowire.AutoWireHandler;
 import org.main.redstoneutils.client.ui.RedstoneMessages;
 import org.main.redstoneutils.network.RedstoneUtilsNetworking;
 
@@ -23,19 +27,33 @@ public final class RedstoneUtilsClientNetworking {
                         Component.translatable(payload.componentTranslationKey())
                 )))
         );
+        ClientPlayNetworking.registerGlobalReceiver(RedstoneUtilsNetworking.AutoWireStatePayload.TYPE, (payload, context) ->
+                context.client().execute(() -> AutoWireHandler.applyServerMode(payload.mode(), payload.accepted()))
+        );
     }
 
     public static boolean hasServerBackend() {
+        return canSend(RedstoneUtilsNetworking.BackendProbePayload.TYPE);
+    }
+
+    public static boolean hasAutoWireBackend() {
+        return canSend(RedstoneUtilsNetworking.SetAutoWirePayload.TYPE);
+    }
+
+    public static boolean hasTeleportBackend() {
+        return canSend(RedstoneUtilsNetworking.TeleportPayload.TYPE);
+    }
+
+    private static boolean canSend(net.minecraft.network.protocol.common.custom.CustomPacketPayload.Type<?> type) {
         try {
-            return ClientPlayNetworking.canSend(RedstoneUtilsNetworking.SetAutoWirePayload.TYPE)
-                    && ClientPlayNetworking.canSend(RedstoneUtilsNetworking.TeleportPayload.TYPE);
+            return ClientPlayNetworking.canSend(type);
         } catch (IllegalArgumentException | IllegalStateException ignored) {
             return false;
         }
     }
 
     public static boolean setServerAutoWire(WireType wireType) {
-        if (!hasServerBackend()) return false;
+        if (!hasAutoWireBackend()) return false;
 
         String mode = wireType == null
                 ? "none"
@@ -45,9 +63,25 @@ public final class RedstoneUtilsClientNetworking {
     }
 
     public static boolean teleport(double range) {
-        if (!hasServerBackend()) return false;
+        if (!hasTeleportBackend()) return false;
 
         ClientPlayNetworking.send(new RedstoneUtilsNetworking.TeleportPayload(range));
+        return true;
+    }
+
+    /**
+     * Sends a command straight to the server without passing it through Fabric's
+     * client-command dispatcher a second time.
+     */
+    public static boolean sendServerCommand(String command) {
+        ClientPacketListener connection = Minecraft.getInstance().getConnection();
+        if (connection == null || command == null) return false;
+
+        String normalized = command.strip();
+        if (normalized.startsWith("/")) normalized = normalized.substring(1);
+        if (normalized.isBlank()) return false;
+
+        connection.getConnection().send(new ServerboundChatCommandPacket(normalized));
         return true;
     }
 }

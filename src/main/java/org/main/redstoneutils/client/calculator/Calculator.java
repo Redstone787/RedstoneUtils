@@ -13,6 +13,9 @@ public final class Calculator {
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, dedicated) -> {
             dispatcher.register(ClientCommands.literal("calc")
                     .executes(context -> openCalculator()));
+            dispatcher.register(ClientCommands.literal("redstoneutils")
+                    .then(ClientCommands.literal("calc")
+                            .executes(context -> openCalculator())));
         });
     }
 

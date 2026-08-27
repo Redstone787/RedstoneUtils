@@ -14,8 +14,10 @@ public final class RedstoneUtilsNetworking {
     public static void init() {
         PayloadTypeRegistry.serverboundPlay().register(SetAutoWirePayload.TYPE, SetAutoWirePayload.CODEC);
         PayloadTypeRegistry.serverboundPlay().register(TeleportPayload.TYPE, TeleportPayload.CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(BackendProbePayload.TYPE, BackendProbePayload.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(ClientCommandPayload.TYPE, ClientCommandPayload.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(AutoWireFeedbackPayload.TYPE, AutoWireFeedbackPayload.CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(AutoWireStatePayload.TYPE, AutoWireStatePayload.CODEC);
     }
 
     public record SetAutoWirePayload(String mode) implements CustomPacketPayload {
@@ -60,6 +62,17 @@ public final class RedstoneUtilsNetworking {
         }
     }
 
+    public record BackendProbePayload() implements CustomPacketPayload {
+        public static final BackendProbePayload INSTANCE = new BackendProbePayload();
+        public static final Type<BackendProbePayload> TYPE = new Type<>(RedstoneUtils.id("backend_probe"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, BackendProbePayload> CODEC = StreamCodec.unit(INSTANCE);
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
     public record ClientCommandPayload(String action, int value) implements CustomPacketPayload {
         public static final Type<ClientCommandPayload> TYPE = new Type<>(RedstoneUtils.id("client_command"));
         public static final StreamCodec<RegistryFriendlyByteBuf, ClientCommandPayload> CODEC = StreamCodec.ofMember(
@@ -96,6 +109,28 @@ public final class RedstoneUtilsNetworking {
         private void write(RegistryFriendlyByteBuf buf) {
             buf.writeUtf(reason, 64);
             buf.writeUtf(componentTranslationKey, 128);
+        }
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    public record AutoWireStatePayload(String mode, boolean accepted) implements CustomPacketPayload {
+        public static final Type<AutoWireStatePayload> TYPE = new Type<>(RedstoneUtils.id("autowire_state"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, AutoWireStatePayload> CODEC = StreamCodec.ofMember(
+                AutoWireStatePayload::write,
+                AutoWireStatePayload::read
+        );
+
+        private static AutoWireStatePayload read(RegistryFriendlyByteBuf buf) {
+            return new AutoWireStatePayload(buf.readUtf(64), buf.readBoolean());
+        }
+
+        private void write(RegistryFriendlyByteBuf buf) {
+            buf.writeUtf(mode, 64);
+            buf.writeBoolean(accepted);
         }
 
         @Override

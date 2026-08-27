@@ -32,6 +32,7 @@ public final class MacroStore {
     private static String activeProfile = RedstoneUtilsConfig.GLOBAL_PROFILE;
     private static Path recoveryBackup;
     private static boolean loaded;
+    private static boolean skipPreviousBackup;
 
     private MacroStore() {
     }
@@ -46,9 +47,10 @@ public final class MacroStore {
                 if (loadedData == null) throw new IOException("Empty macro file");
                 data = loadedData;
             } catch (IOException | RuntimeException exception) {
-                recoveryBackup = backup(path);
-                data = new MacroData();
-                RedstoneUtils.LOGGER.error("Could not read {}; macros were preserved in a backup", path, exception);
+                recoveryBackup = preserveDamaged(path);
+                data = loadLastValidBackup(path);
+                skipPreviousBackup = true;
+                RedstoneUtils.LOGGER.error("Could not read {}; the last valid macro backup or an empty store will be used", path, exception);
             }
         }
         migrateAndSanitize();
@@ -64,8 +66,10 @@ public final class MacroStore {
             try (Writer writer = Files.newBufferedWriter(temporary)) {
                 GSON.toJson(data, writer);
             }
+            preservePreviousValid(path);
             moveAtomically(temporary, path);
-        } catch (IOException exception) {
+            skipPreviousBackup = false;
+        } catch (IOException | RuntimeException exception) {
             RedstoneUtils.LOGGER.error("Could not save RedstoneUtils macros", exception);
         }
     }
@@ -78,9 +82,7 @@ public final class MacroStore {
 
     public static synchronized void activateProfile(String profileKey) {
         load();
-        activeProfile = profileKey == null || profileKey.isBlank()
-                ? RedstoneUtilsConfig.GLOBAL_PROFILE
-                : profileKey.strip();
+        activeProfile = RedstoneUtilsConfig.normalizeProfileKey(profileKey);
         data.profiles.computeIfAbsent(activeProfile, ignored -> data.profiles
                 .getOrDefault(RedstoneUtilsConfig.GLOBAL_PROFILE, List.of())
                 .stream().map(Macro::copy).collect(java.util.stream.Collectors.toCollection(ArrayList::new)));
@@ -106,9 +108,13 @@ public final class MacroStore {
     }
 
     public static synchronized void upsert(Macro macro) {
-        if (macro == null) return;
+        if (!isValidBeforeSanitize(macro)) return;
         Macro sanitized = macro.copy();
         sanitized.sanitize();
+        if (!isValidAfterSanitize(sanitized)) return;
+        if (sanitized.isCommandAlias() && aliasExists(sanitized.alias(), sanitized.id())) return;
+        if (sanitized.isKeybind() && MacroKeys.isBound(sanitized.keyCode())
+                && bindingExists(sanitized.keyCode(), sanitized.mouseButton(), sanitized.modifiers(), sanitized.id())) return;
         List<Macro> macros = activeMacros();
         for (int index = 0; index < macros.size(); index++) {
             if (macros.get(index).id().equals(sanitized.id())) {
@@ -126,9 +132,11 @@ public final class MacroStore {
         if (source.isEmpty()) return Optional.empty();
         Macro macro = source.get();
         String alias = macro.isCommandAlias() ? uniqueCopyAlias(macro) : macro.alias();
+        int keyCode = macro.isKeybind() ? Macro.UNBOUND_KEY : macro.keyCode();
+        boolean enabled = macro.isCommandAlias() && macro.enabled();
         Macro duplicate = new Macro(
-                UUID.randomUUID().toString(), macro.type(), Component.translatable("macros.redstoneutils.copy_name", macro.name()).getString(), macro.command(), macro.keyCode(), alias,
-                macro.mouseButton(), macro.modifiers(), macro.trigger(), macro.enabled(), macro.category()
+                UUID.randomUUID().toString(), macro.type(), Component.translatable("macros.redstoneutils.copy_name", macro.name()).getString(), macro.command(), keyCode, alias,
+                macro.mouseButton(), macro.modifiers(), macro.trigger(), enabled, macro.category()
         );
         upsert(duplicate);
         return Optional.of(duplicate.copy());
@@ -219,8 +227,10 @@ public final class MacroStore {
         if (imported == null) return 0;
         int count = 0;
         for (Macro macro : imported) {
-            if (macro == null) continue;
+            if (macro != null && (macro.type() == null || macro.type() == MacroType.KEYBIND) && !MacroKeys.isBound(macro.keyCode())) continue;
+            if (!isValidBeforeSanitize(macro)) continue;
             macro.sanitize();
+            if (!isValidAfterSanitize(macro)) continue;
             Macro unique = new Macro(
                     UUID.randomUUID().toString(), macro.type(), macro.name(), macro.command(), macro.keyCode(), macro.alias(),
                     macro.mouseButton(), macro.modifiers(), macro.trigger(), macro.enabled(), macro.category()
@@ -260,18 +270,69 @@ public final class MacroStore {
         data.profiles.entrySet().removeIf(entry -> entry.getKey() == null || entry.getValue() == null);
         for (List<Macro> macros : data.profiles.values()) {
             List<Macro> sanitized = new ArrayList<>();
+            java.util.Set<String> ids = new java.util.HashSet<>();
+            java.util.Set<String> aliases = new java.util.HashSet<>();
+            java.util.Set<String> bindings = new java.util.HashSet<>();
             for (Macro macro : macros) {
-                if (macro == null) continue;
+                if (!isValidBeforeSanitize(macro)) continue;
                 macro.sanitize();
-                sanitized.add(macro.copy());
+                if (!isValidAfterSanitize(macro)) continue;
+
+                Macro clean = macro.copy();
+                if (!ids.add(clean.id())) {
+                    clean = new Macro(
+                            UUID.randomUUID().toString(), clean.type(), clean.name(), clean.command(), clean.keyCode(), clean.alias(),
+                            clean.mouseButton(), clean.modifiers(), clean.trigger(), clean.enabled(), clean.category()
+                    );
+                    ids.add(clean.id());
+                }
+                if (clean.isCommandAlias() && !aliases.add(clean.alias())) continue;
+                if (clean.isKeybind() && !bindings.add(bindingKey(clean))) continue;
+                sanitized.add(clean);
             }
             macros.clear();
             macros.addAll(sanitized);
         }
     }
 
-    private static Path backup(Path path) {
-        Path backup = path.resolveSibling(path.getFileName() + ".bak");
+    private static boolean isValidBeforeSanitize(Macro macro) {
+        if (macro == null || MacroCommandText.normalizeCommand(macro.command()).isBlank()) return false;
+        MacroType type = macro.type() == null ? MacroType.KEYBIND : macro.type();
+        if (type == MacroType.KEYBIND) return MacroKeys.isBound(macro.keyCode()) || !macro.enabled();
+
+        String alias = macro.alias();
+        String normalizedAlias = MacroCommandText.normalizeAlias(alias);
+        return MacroCommandText.isValidAliasInput(alias)
+                && !CommandCommand.isReservedAlias(normalizedAlias)
+                && !MacroCommandText.normalizeAlias(macro.command()).equals(normalizedAlias);
+    }
+
+    private static boolean isValidAfterSanitize(Macro macro) {
+        if (macro.command().isBlank()) return false;
+        if (macro.isKeybind()) return MacroKeys.isBound(macro.keyCode()) || !macro.enabled();
+        return MacroCommandText.isValidAliasInput(macro.alias())
+                && !CommandCommand.isReservedAlias(macro.alias())
+                && !MacroCommandText.normalizeAlias(macro.command()).equals(macro.alias());
+    }
+
+    private static String bindingKey(Macro macro) {
+        return macro.keyCode() + ":" + macro.mouseButton() + ":" + macro.modifiers();
+    }
+
+    private static MacroData loadLastValidBackup(Path path) {
+        Path backup = validBackup(path);
+        if (!Files.exists(backup)) return new MacroData();
+        try (Reader reader = Files.newBufferedReader(backup)) {
+            MacroData restored = GSON.fromJson(reader, MacroData.class);
+            return restored == null ? new MacroData() : restored;
+        } catch (IOException | RuntimeException exception) {
+            RedstoneUtils.LOGGER.error("Could not read last valid macro backup {}", backup, exception);
+            return new MacroData();
+        }
+    }
+
+    private static Path preserveDamaged(Path path) {
+        Path backup = path.resolveSibling(path.getFileName() + ".corrupt-" + System.currentTimeMillis() + ".bak");
         try {
             Files.copy(path, backup, StandardCopyOption.REPLACE_EXISTING);
             return backup;
@@ -279,6 +340,19 @@ public final class MacroStore {
             RedstoneUtils.LOGGER.error("Could not back up damaged macro file {}", path, exception);
             return null;
         }
+    }
+
+    private static void preservePreviousValid(Path path) {
+        if (skipPreviousBackup || !Files.exists(path)) return;
+        try {
+            Files.copy(path, validBackup(path), StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException exception) {
+            RedstoneUtils.LOGGER.error("Could not update last valid macro backup", exception);
+        }
+    }
+
+    private static Path validBackup(Path path) {
+        return path.resolveSibling(path.getFileName() + ".bak");
     }
 
     private static void moveAtomically(Path source, Path target) throws IOException {

@@ -23,6 +23,7 @@ public final class RedstoneUtilsServerConfig {
 
     private static Data data = new Data();
     private static boolean loaded;
+    private static boolean skipPreviousBackup;
 
     private RedstoneUtilsServerConfig() {
     }
@@ -38,9 +39,10 @@ public final class RedstoneUtilsServerConfig {
                 if (loadedData == null) throw new IOException("Empty server config");
                 data = loadedData;
             } catch (IOException | RuntimeException exception) {
-                backup(path);
-                data = new Data();
-                RedstoneUtils.LOGGER.error("Could not read {}; preserved it as a .bak file", path, exception);
+                Path damaged = preserveDamaged(path);
+                data = loadLastValidBackup(path);
+                skipPreviousBackup = true;
+                RedstoneUtils.LOGGER.error("Could not read {}; preserved it as {} and loaded the last valid backup or defaults", path, damaged, exception);
             }
         }
 
@@ -57,12 +59,14 @@ public final class RedstoneUtilsServerConfig {
             try (Writer writer = Files.newBufferedWriter(temporary)) {
                 GSON.toJson(data, writer);
             }
+            preservePreviousValid(path);
             try {
                 Files.move(temporary, path, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
             } catch (IOException ignored) {
                 Files.move(temporary, path, StandardCopyOption.REPLACE_EXISTING);
             }
-        } catch (IOException exception) {
+            skipPreviousBackup = false;
+        } catch (IOException | RuntimeException exception) {
             RedstoneUtils.LOGGER.error("Could not save RedstoneUtils server config", exception);
         }
     }
@@ -121,20 +125,52 @@ public final class RedstoneUtilsServerConfig {
         if (data.signalToolsPermission == null) data.signalToolsPermission = AccessRule.OP_OR_CREATIVE;
         if (data.builderPermission == null) data.builderPermission = AccessRule.OP_OR_CREATIVE;
         if (data.historyPermission == null) data.historyPermission = AccessRule.OP_OR_CREATIVE;
-        data.maxTeleportRange = Math.clamp(data.maxTeleportRange, 10.0D, 100_000.0D);
-        data.maxTargetRange = Math.clamp(data.maxTargetRange, 4.0D, 1_024.0D);
+        data.maxTeleportRange = Math.clamp(finite(data.maxTeleportRange, 1_000.0D), 10.0D, 100_000.0D);
+        data.maxTargetRange = Math.clamp(finite(data.maxTargetRange, 128.0D), 4.0D, 1_024.0D);
         data.maxContainerItems = Math.clamp(data.maxContainerItems, 0, 1_000_000);
         data.maxComparatorClockTicks = Math.clamp(data.maxComparatorClockTicks, 2, 600);
         data.maxHopperClockTicks = Math.clamp(data.maxHopperClockTicks, 7, 2_554);
         data.historySize = Math.clamp(data.historySize, 1, 100);
     }
 
-    private static void backup(Path path) {
+    private static double finite(double value, double fallback) {
+        return Double.isFinite(value) ? value : fallback;
+    }
+
+    private static Data loadLastValidBackup(Path path) {
+        Path backup = validBackup(path);
+        if (!Files.exists(backup)) return new Data();
+        try (Reader reader = Files.newBufferedReader(backup)) {
+            Data restored = GSON.fromJson(reader, Data.class);
+            return restored == null ? new Data() : restored;
+        } catch (IOException | RuntimeException exception) {
+            RedstoneUtils.LOGGER.error("Could not read last valid server config backup {}", backup, exception);
+            return new Data();
+        }
+    }
+
+    private static Path preserveDamaged(Path path) {
+        Path backup = path.resolveSibling(path.getFileName() + ".corrupt-" + System.currentTimeMillis() + ".bak");
         try {
-            Files.copy(path, path.resolveSibling(path.getFileName() + ".bak"), StandardCopyOption.REPLACE_EXISTING);
+            Files.copy(path, backup, StandardCopyOption.REPLACE_EXISTING);
+            return backup;
         } catch (IOException exception) {
             RedstoneUtils.LOGGER.error("Could not back up damaged server config {}", path, exception);
+            return path;
         }
+    }
+
+    private static void preservePreviousValid(Path path) {
+        if (skipPreviousBackup || !Files.exists(path)) return;
+        try {
+            Files.copy(path, validBackup(path), StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException exception) {
+            RedstoneUtils.LOGGER.error("Could not update last valid server config backup", exception);
+        }
+    }
+
+    private static Path validBackup(Path path) {
+        return path.resolveSibling(path.getFileName() + ".bak");
     }
 
     private static Path path() {

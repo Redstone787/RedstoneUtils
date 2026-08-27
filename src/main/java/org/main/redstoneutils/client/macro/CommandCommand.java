@@ -11,7 +11,20 @@ import java.util.Set;
 public final class CommandCommand {
 
     private static final int MAX_ALIAS_DEPTH = 8;
-    private static final Set<String> RESERVED_ALIASES = Set.of("redstone_utils");
+    private static final Set<String> RESERVED_ALIASES = Set.of(
+            "autowire",
+            "calc",
+            "clock",
+            "color",
+            "macro",
+            "overlay",
+            "redstone",
+            "redstoneutils",
+            "sculkinfo",
+            "set-content",
+            "set-signal",
+            "signal"
+    );
     private static final ThreadLocal<Boolean> BYPASS_ALIAS_EXPANSION = ThreadLocal.withInitial(() -> false);
 
     private static boolean initialized;
@@ -37,12 +50,16 @@ public final class CommandCommand {
         Set<String> visitedAliases = new HashSet<>();
         boolean expanded = false;
 
-        for (int depth = 0; depth < MAX_ALIAS_DEPTH; depth++) {
+        for (int depth = 0; ; depth++) {
             String root = MacroCommandText.commandRoot(currentCommand).toLowerCase(Locale.ROOT);
             if (root.isBlank()) return new Expansion(currentCommand, expanded, null);
+            if (isReservedAlias(root)) return new Expansion(currentCommand, expanded, null);
 
             Macro macro = MacroStore.findCommandAlias(root).orElse(null);
             if (macro == null) return new Expansion(currentCommand, expanded, null);
+            if (depth >= MAX_ALIAS_DEPTH) {
+                return new Expansion(currentCommand, expanded, Component.translatable("message.redstoneutils.macro.alias_depth").getString());
+            }
 
             if (!visitedAliases.add(root)) {
                 return new Expansion(currentCommand, expanded, Component.translatable("message.redstoneutils.macro.alias_loop", "/" + root).getString());
@@ -52,8 +69,6 @@ public final class CommandCommand {
             currentCommand = MacroCommandText.appendArguments(macro.command(), arguments);
             expanded = true;
         }
-
-        return new Expansion(currentCommand, expanded, Component.translatable("message.redstoneutils.macro.alias_depth").getString());
     }
 
     static void withoutAliasExpansion(Runnable runnable) {

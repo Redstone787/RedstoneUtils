@@ -14,12 +14,17 @@ public final class RedstoneUtilsServerNetworking {
     public static void init() {
         ServerPlayNetworking.registerGlobalReceiver(RedstoneUtilsNetworking.SetAutoWirePayload.TYPE, (payload, context) -> {
             if (!RedstoneUtilsCommands.canUseAutoWire(context.player().createCommandSourceStack())) {
+                ServerAutoWire.deny(context.player());
                 context.player().sendSystemMessage(Component.translatable("message.redstoneutils.permission.autowire"));
                 return;
             }
 
             WireType wireType = WireType.find(payload.mode()).orElse(WireType.NONE);
             ServerAutoWire.setWireType(context.player(), wireType);
+        });
+
+        ServerPlayNetworking.registerGlobalReceiver(RedstoneUtilsNetworking.BackendProbePayload.TYPE, (payload, context) -> {
+            // Registration of this payload is the capability handshake; no response is required.
         });
 
         ServerPlayNetworking.registerGlobalReceiver(RedstoneUtilsNetworking.TeleportPayload.TYPE, (payload, context) -> {

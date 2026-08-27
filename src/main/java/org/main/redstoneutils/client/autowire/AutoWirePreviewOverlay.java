@@ -84,7 +84,7 @@ public final class AutoWirePreviewOverlay {
     }
 
     private static void extract(LevelExtractionContext context) {
-        if (OverlayFreeze.wireFrozen() && previewRenderData != null) return;
+        if (OverlayFreeze.wireFrozen()) return;
         previewRenderData = null;
 
         Minecraft minecraft = Minecraft.getInstance();
