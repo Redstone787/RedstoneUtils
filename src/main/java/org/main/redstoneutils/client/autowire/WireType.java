@@ -4,6 +4,9 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.network.chat.Component;
 import org.main.redstoneutils.RedstoneUtils;
 
+import java.util.Locale;
+import java.util.Optional;
+
 public enum WireType {
     NONE("None", 0, "textures/gui/wire/none.png"),
     NORMAL("Normal", 1, "textures/gui/wire/normal.png"),
@@ -25,6 +28,16 @@ public enum WireType {
 
     public int getIndex() {
         return index;
+    }
+
+    public static Optional<WireType> find(String name) {
+        if (name == null) return Optional.empty();
+        String normalized = name.strip().toUpperCase(Locale.ROOT).replace('-', '_');
+        try {
+            return Optional.of(valueOf(normalized));
+        } catch (IllegalArgumentException ignored) {
+            return Optional.empty();
+        }
     }
 
     public String getDisplayName() {

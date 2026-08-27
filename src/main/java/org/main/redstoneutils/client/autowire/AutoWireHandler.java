@@ -61,6 +61,21 @@ public class AutoWireHandler {
         RedstoneUtilsClientNetworking.setServerAutoWire(activeWireType);
     }
 
+    public static void applyServerMode(String mode, boolean accepted) {
+        WireType serverMode = WireType.find(mode).orElse(WireType.NONE);
+        if (accepted && serverMode == activeWireType) return;
+
+        activeWireType = serverMode;
+        RedstoneUtilsConfig.setActiveWireType(serverMode);
+        AutoWire.reset();
+        if (!accepted) {
+            RedstoneMessages.popup(net.minecraft.network.chat.Component.translatable(
+                    "message.redstoneutils.autowire.rejected",
+                    serverMode.getDisplayName()
+            ));
+        }
+    }
+
     public static void reloadFromProfile() {
         activeWireType = RedstoneUtilsConfig.getActiveWireType();
         AutoWire.reset();
@@ -109,7 +124,7 @@ public class AutoWireHandler {
     private static InteractionResult onUseBlock(Player player, Level level, InteractionHand hand, BlockHitResult hitResult) {
         WireType wireType = activeWireType;
         if (wireType == WireType.NONE || !level.isClientSide()) return InteractionResult.PASS;
-        if (RedstoneUtilsClientNetworking.hasServerBackend()) return InteractionResult.PASS;
+        if (RedstoneUtilsClientNetworking.hasAutoWireBackend()) return InteractionResult.PASS;
         if (AutoWirePlacement.isManagedPlacementInProgress()) {
             return InteractionResult.PASS;
         }

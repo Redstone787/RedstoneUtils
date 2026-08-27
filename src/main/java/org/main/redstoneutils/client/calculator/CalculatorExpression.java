@@ -127,10 +127,12 @@ final class CalculatorExpression {
         private double parseNumber() {
             int start = index;
             boolean hasDot = false;
+            boolean hasDigit = false;
 
             while (hasRemaining()) {
                 char current = input.charAt(index);
                 if (Character.isDigit(current)) {
+                    hasDigit = true;
                     index++;
                 } else if (current == '.' && !hasDot) {
                     hasDot = true;
@@ -140,7 +142,14 @@ final class CalculatorExpression {
                 }
             }
 
-            if (start == index || ".".equals(input.substring(start, index))) throw error(message("expected_number"));
+            if (!hasDigit) throw error(message("expected_number"));
+            if (hasRemaining() && (input.charAt(index) == 'e' || input.charAt(index) == 'E')) {
+                index++;
+                if (hasRemaining() && (input.charAt(index) == '+' || input.charAt(index) == '-')) index++;
+                int exponentStart = index;
+                while (hasRemaining() && Character.isDigit(input.charAt(index))) index++;
+                if (index == exponentStart) throw error(message("expected_number"));
+            }
             return Double.parseDouble(input.substring(start, index));
         }
 

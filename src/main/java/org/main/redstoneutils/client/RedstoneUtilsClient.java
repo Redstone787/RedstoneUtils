@@ -12,6 +12,7 @@ import org.main.redstoneutils.client.macro.CommandCommand;
 import org.main.redstoneutils.client.macro.CommandKeybind;
 import org.main.redstoneutils.client.macro.MacroStore;
 import org.main.redstoneutils.client.sculk.SculkSensorOverlay;
+import org.main.redstoneutils.client.signal.SignalUtil;
 import org.main.redstoneutils.client.ui.RedstoneMessages;
 import org.main.redstoneutils.client.ui.RedstoneOverlay;
 import org.main.redstoneutils.client.ui.StatusHud;
@@ -41,6 +42,7 @@ public class RedstoneUtilsClient implements ClientModInitializer {
         CommandCommand.init();
         CommandKeybind.init();
         Calculator.init();
+        SignalUtil.init();
         RedstoneUtilsCommand.init();
         ClientProfiles.init();
         queueRecoveryWarning(RedstoneUtilsConfig.consumeRecoveryBackup(), "message.redstoneutils.config.recovered");

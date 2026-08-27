@@ -14,7 +14,8 @@ import java.util.Set;
 public final class CommandKeybind {
 
     private static final int HELD_REPEAT_TICKS = 4;
-    private static Set<Binding> downBindings = new HashSet<>();
+    private static Set<Binding> physicalDownBindings = new HashSet<>();
+    private static Set<Binding> armedBindings = new HashSet<>();
     private static final Map<String, Integer> heldCooldowns = new HashMap<>();
     private static boolean initialized;
 
@@ -29,13 +30,15 @@ public final class CommandKeybind {
 
     private static void tick(Minecraft client) {
         if (client == null || client.player == null || client.getConnection() == null || client.gui.screen() != null) {
-            downBindings.clear();
+            physicalDownBindings.clear();
+            armedBindings.clear();
             heldCooldowns.clear();
             return;
         }
 
         List<Macro> macros = MacroStore.macros(MacroType.KEYBIND);
-        Set<Binding> currentDown = new HashSet<>();
+        Set<Binding> currentPhysicalDown = new HashSet<>();
+        Set<Binding> currentArmed = new HashSet<>();
         int activeModifiers = currentModifiers(client);
 
         for (Macro macro : macros) {
@@ -43,33 +46,36 @@ public final class CommandKeybind {
             Binding binding = new Binding(macro.keyCode(), macro.mouseButton(), macro.modifiers());
             boolean physicalDown = isDown(client, binding);
             boolean modifiersMatch = activeModifiers == binding.modifiers();
-            boolean wasDown = downBindings.contains(binding);
-            boolean isDown = physicalDown && modifiersMatch;
-            if (isDown) currentDown.add(binding);
+            boolean wasPhysicalDown = physicalDownBindings.contains(binding);
+            boolean armed = armedBindings.contains(binding);
+            if (physicalDown) currentPhysicalDown.add(binding);
+            if (physicalDown && !wasPhysicalDown && modifiersMatch) armed = true;
+            if (physicalDown && armed) currentArmed.add(binding);
 
             switch (macro.trigger()) {
                 case PRESSED -> {
-                    if (isDown && !wasDown) MacroExecutor.execute(macro);
+                    if (physicalDown && !wasPhysicalDown && modifiersMatch) MacroExecutor.execute(macro);
                 }
                 case RELEASED -> {
-                    if (!isDown && wasDown) MacroExecutor.execute(macro);
+                    if (!physicalDown && wasPhysicalDown && armed) MacroExecutor.execute(macro);
                 }
-                case HELD -> tickHeld(macro, isDown, wasDown);
+                case HELD -> tickHeld(macro, physicalDown && armed && modifiersMatch);
             }
         }
-        downBindings = currentDown;
+        physicalDownBindings = currentPhysicalDown;
+        armedBindings = currentArmed;
         heldCooldowns.keySet().removeIf(id -> macros.stream().noneMatch(macro -> macro.id().equals(id)));
     }
 
-    private static void tickHeld(Macro macro, boolean isDown, boolean wasDown) {
-        if (!isDown) {
+    private static void tickHeld(Macro macro, boolean active) {
+        if (!active) {
             heldCooldowns.remove(macro.id());
             return;
         }
         int cooldown = heldCooldowns.getOrDefault(macro.id(), 0);
-        if (!wasDown || cooldown <= 0) {
+        if (cooldown <= 0) {
             MacroExecutor.execute(macro);
-            heldCooldowns.put(macro.id(), HELD_REPEAT_TICKS);
+            heldCooldowns.put(macro.id(), HELD_REPEAT_TICKS - 1);
         } else {
             heldCooldowns.put(macro.id(), cooldown - 1);
         }

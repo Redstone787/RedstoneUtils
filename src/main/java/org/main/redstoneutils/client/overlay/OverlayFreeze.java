@@ -23,7 +23,10 @@ public final class OverlayFreeze {
     public static void setSculkFrozen(boolean value) { sculk = value; }
 
     public static void toggleAll() {
-        boolean frozen = !anyFrozen();
+        setAllFrozen(!anyFrozen());
+    }
+
+    public static void setAllFrozen(boolean frozen) {
         wire = frozen;
         bud = frozen;
         sculk = frozen;

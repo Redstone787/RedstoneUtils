@@ -5,6 +5,10 @@ import java.util.UUID;
 public final class Macro {
 
     public static final int UNBOUND_KEY = -1;
+    public static final boolean DEFAULT_ENABLED = true;
+    public static final int MAX_NAME_LENGTH = 80;
+    public static final int MAX_COMMAND_LENGTH = 512;
+    public static final int MAX_ALIAS_LENGTH = 64;
 
     private String id = UUID.randomUUID().toString();
     private MacroType type = MacroType.KEYBIND;
@@ -15,7 +19,7 @@ public final class Macro {
     private boolean mouseButton;
     private int modifiers;
     private MacroTrigger trigger = MacroTrigger.PRESSED;
-    private boolean enabled = true;
+    private boolean enabled = DEFAULT_ENABLED;
     private String category = "General";
 
     public Macro() {
@@ -103,11 +107,14 @@ public final class Macro {
 
         name = name == null ? "" : name.trim();
         if (name.isBlank()) name = "Macro";
+        if (name.length() > MAX_NAME_LENGTH) name = name.substring(0, MAX_NAME_LENGTH);
 
         command = MacroCommandText.normalizeCommand(command);
+        if (command.length() > MAX_COMMAND_LENGTH) command = command.substring(0, MAX_COMMAND_LENGTH).stripTrailing();
 
         if (type == MacroType.COMMAND) {
             alias = MacroCommandText.normalizeAlias(alias);
+            if (alias.length() > MAX_ALIAS_LENGTH) alias = alias.substring(0, MAX_ALIAS_LENGTH);
             keyCode = UNBOUND_KEY;
             mouseButton = false;
             modifiers = 0;

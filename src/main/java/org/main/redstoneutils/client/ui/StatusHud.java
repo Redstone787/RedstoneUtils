@@ -33,8 +33,11 @@ public final class StatusHud implements HudElement {
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, DeltaTracker deltaTracker) {
-        if (!RedstoneUtilsConfig.isStatusHudVisible() || Minecraft.getInstance().player == null) return;
-        Font font = Minecraft.getInstance().font;
+        Minecraft minecraft = Minecraft.getInstance();
+        if (!RedstoneUtilsConfig.isStatusHudVisible()
+                || minecraft.player == null
+                || minecraft.getDebugOverlay().showDebugScreen()) return;
+        Font font = minecraft.font;
         List<String> lines = lines();
         int width = lines.stream().mapToInt(font::width).max().orElse(0) + 12;
         int height = lines.size() * (font.lineHeight + 2) + 8;

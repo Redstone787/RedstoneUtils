@@ -18,8 +18,10 @@ import net.minecraft.gizmos.GizmoStyle;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.DispenserBlock;
 import net.minecraft.world.level.block.piston.PistonBaseBlock;
+import net.minecraft.world.level.block.piston.PistonStructureResolver;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.phys.AABB;
 import org.main.redstoneutils.client.config.RedstoneUtilsConfig;
 import org.main.redstoneutils.client.overlay.OverlayFreeze;
@@ -29,13 +31,9 @@ import java.util.List;
 
 public final class BudSwitchOverlay {
 
-    private static final long REBUILD_INTERVAL_NANOS = 100_000_000L;
-    private static final int MAX_SIGNAL_POWER = 15;
-    private static final int CAUSE_FILL_COLOR = 0x48FFD21A;
-    private static final int CAUSE_STROKE_COLOR = 0xF0FFE052;
-    private static final int AFFECTED_FILL_COLOR = 0x48FF2018;
-    private static final int AFFECTED_STROKE_COLOR = 0xF0FF5148;
-    private static final float STROKE_WIDTH = 2.5F;
+    private static final long MIN_REBUILD_INTERVAL_NANOS = 100_000_000L;
+    private static final long MEDIUM_REBUILD_INTERVAL_NANOS = 250_000_000L;
+    private static final long LARGE_REBUILD_INTERVAL_NANOS = 500_000_000L;
     private static final double BOX_INFLATE = 0.006D;
     private static final Direction[] DIRECTIONS = Direction.values();
     private static final Direction[] QUASI_POWER_DIRECTIONS = {
@@ -97,7 +95,7 @@ public final class BudSwitchOverlay {
             requestRefresh();
             return;
         }
-        if (OverlayFreeze.budFrozen() && renderData != null) return;
+        if (OverlayFreeze.budFrozen()) return;
 
         Minecraft minecraft = Minecraft.getInstance();
         LocalPlayer player = minecraft.player;
@@ -119,41 +117,42 @@ public final class BudSwitchOverlay {
         lastLevel = level;
         lastScanCenter = playerPos.immutable();
         scanValid = true;
-        nextRebuildNanos = now + REBUILD_INTERVAL_NANOS;
-        renderData = buildRenderData(level, playerPos, Math.min(RedstoneUtilsConfig.getBudTestRange(), RedstoneUtilsConfig.getOverlayMaxDistance()));
+        int range = Math.min(RedstoneUtilsConfig.getBudTestRange(), RedstoneUtilsConfig.getOverlayMaxDistance());
+        nextRebuildNanos = now + rebuildIntervalNanos(range);
+        renderData = buildRenderData(level, playerPos, range);
+    }
+
+    private static long rebuildIntervalNanos(int range) {
+        if (range > 32) return LARGE_REBUILD_INTERVAL_NANOS;
+        if (range > 16) return MEDIUM_REBUILD_INTERVAL_NANOS;
+        return MIN_REBUILD_INTERVAL_NANOS;
     }
 
     private static BudRenderData buildRenderData(ClientLevel level, BlockPos center, int range) {
         LongSet affectedBlocks = new LongOpenHashSet();
         LongSet causeBlocks = new LongOpenHashSet();
         int rangeSquared = range * range;
-        BlockPos.MutableBlockPos mutablePos = new BlockPos.MutableBlockPos();
+        int minChunkX = (center.getX() - range) >> 4;
+        int maxChunkX = (center.getX() + range) >> 4;
+        int minChunkZ = (center.getZ() - range) >> 4;
+        int maxChunkZ = (center.getZ() + range) >> 4;
 
-        for (int dx = -range; dx <= range; dx++) {
-            for (int dy = -range; dy <= range; dy++) {
-                for (int dz = -range; dz <= range; dz++) {
-                    if (dx * dx + dy * dy + dz * dz > rangeSquared) {
-                        continue;
-                    }
-
-                    mutablePos.set(center.getX() + dx, center.getY() + dy, center.getZ() + dz);
-                    if (level.isOutsideBuildHeight(mutablePos) || !level.isLoaded(mutablePos)) {
-                        continue;
-                    }
-
-                    BlockState blockState = level.getBlockState(mutablePos);
-                    if (!isQuasiConnectivityComponent(blockState)) {
-                        continue;
-                    }
-
-                    LongSet componentCauses = findPotentialQuasiPowerCauses(level, mutablePos);
-                    if (componentCauses.isEmpty()) {
-                        continue;
-                    }
-
-                    affectedBlocks.add(mutablePos.asLong());
-                    causeBlocks.addAll(componentCauses);
+        for (int chunkX = minChunkX; chunkX <= maxChunkX; chunkX++) {
+            for (int chunkZ = minChunkZ; chunkZ <= maxChunkZ; chunkZ++) {
+                ChunkAccess chunk = level.getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
+                if (chunk == null) {
+                    continue;
                 }
+
+                chunk.findBlocks(BudSwitchOverlay::isQuasiConnectivityComponent, (componentPos, componentState) -> {
+                    if (!isInsideSphere(componentPos, center, rangeSquared)
+                            || !isArmedBud(level, componentPos, componentState)) {
+                        return;
+                    }
+
+                    affectedBlocks.add(componentPos.asLong());
+                    collectCurrentQuasiPowerCauses(level, componentPos, causeBlocks);
+                });
             }
         }
 
@@ -170,84 +169,74 @@ public final class BudSwitchOverlay {
                 || blockState.getBlock() instanceof DispenserBlock;
     }
 
-    private static LongSet findPotentialQuasiPowerCauses(Level level, BlockPos componentPos) {
-        LongSet causes = new LongOpenHashSet();
-        BlockPos quasiPowerCenter = componentPos.above();
+    private static boolean isInsideSphere(BlockPos blockPos, BlockPos center, int rangeSquared) {
+        long dx = blockPos.getX() - center.getX();
+        long dy = blockPos.getY() - center.getY();
+        long dz = blockPos.getZ() - center.getZ();
+        return dx * dx + dy * dy + dz * dz <= rangeSquared;
+    }
 
-        for (Direction direction : QUASI_POWER_DIRECTIONS) {
-            BlockPos causePos = quasiPowerCenter.relative(direction);
-            if (!level.isOutsideBuildHeight(causePos)
-                    && level.isLoaded(causePos)
-                    && canCurrentlyOrPotentiallyPower(level, causePos, direction)) {
-                causes.add(causePos.asLong());
+    private static boolean isArmedBud(Level level, BlockPos componentPos, BlockState componentState) {
+        if (componentState.getBlock() instanceof PistonBaseBlock) {
+            Direction facing = componentState.getValue(PistonBaseBlock.FACING);
+            if (hasDirectPistonPower(level, componentPos, facing)) {
+                return false;
+            }
+
+            boolean quasiPowered = hasQuasiPistonPower(level, componentPos);
+            boolean extended = componentState.getValue(PistonBaseBlock.EXTENDED);
+            if (quasiPowered == extended) {
+                return false;
+            }
+
+            return extended || new PistonStructureResolver(level, componentPos, facing, true).resolve();
+        }
+
+        if (componentState.getBlock() instanceof DispenserBlock) {
+            if (level.hasNeighborSignal(componentPos)) {
+                return false;
+            }
+
+            boolean quasiPowered = level.hasNeighborSignal(componentPos.above());
+            boolean triggered = componentState.getValue(DispenserBlock.TRIGGERED);
+            return quasiPowered != triggered;
+        }
+
+        return false;
+    }
+
+    private static boolean hasDirectPistonPower(Level level, BlockPos pistonPos, Direction facing) {
+        for (Direction direction : DIRECTIONS) {
+            if (direction != facing && level.hasSignal(pistonPos.relative(direction), direction)) {
+                return true;
             }
         }
 
-        return causes;
+        return level.hasSignal(pistonPos, Direction.DOWN);
     }
 
-    private static boolean canCurrentlyOrPotentiallyPower(Level level, BlockPos causePos, Direction signalDirection) {
-        if (level.hasSignal(causePos, signalDirection)) {
-            return true;
-        }
-
-        BlockState causeState = level.getBlockState(causePos);
-        if (canEmitPotentialSignal(causeState, level, causePos, signalDirection, false)) {
-            return true;
-        }
-
-        return causeState.isRedstoneConductor(level, causePos)
-                && hasCurrentOrPotentialDirectInput(level, causePos);
-    }
-
-    private static boolean hasCurrentOrPotentialDirectInput(Level level, BlockPos conductorPos) {
-        for (Direction direction : DIRECTIONS) {
-            BlockPos inputPos = conductorPos.relative(direction);
-            if (!level.isOutsideBuildHeight(inputPos) && level.isLoaded(inputPos)) {
-                BlockState inputState = level.getBlockState(inputPos);
-                if (canEmitPotentialSignal(inputState, level, inputPos, direction, true)) {
-                    return true;
-                }
+    private static boolean hasQuasiPistonPower(Level level, BlockPos pistonPos) {
+        BlockPos quasiPowerCenter = pistonPos.above();
+        for (Direction direction : QUASI_POWER_DIRECTIONS) {
+            if (level.hasSignal(quasiPowerCenter.relative(direction), direction)) {
+                return true;
             }
         }
 
         return false;
     }
 
-    private static boolean canEmitPotentialSignal(BlockState blockState, Level level, BlockPos blockPos,
-                                                  Direction signalDirection, boolean direct) {
-        if (!blockState.isSignalSource()) {
-            return false;
+    private static void collectCurrentQuasiPowerCauses(Level level, BlockPos componentPos, LongSet causes) {
+        BlockPos quasiPowerCenter = componentPos.above();
+        BlockPos.MutableBlockPos causePos = new BlockPos.MutableBlockPos();
+        for (Direction direction : QUASI_POWER_DIRECTIONS) {
+            causePos.setWithOffset(quasiPowerCenter, direction);
+            if (!level.isOutsideBuildHeight(causePos)
+                    && level.isLoaded(causePos)
+                    && level.hasSignal(causePos, direction)) {
+                causes.add(causePos.asLong());
+            }
         }
-
-        if (signal(blockState, level, blockPos, signalDirection, direct) > 0) {
-            return true;
-        }
-
-        BlockState poweredState = maximallyPoweredState(blockState);
-        return poweredState != blockState
-                && signal(poweredState, level, blockPos, signalDirection, direct) > 0;
-    }
-
-    private static int signal(BlockState blockState, Level level, BlockPos blockPos,
-                              Direction signalDirection, boolean direct) {
-        return direct
-                ? blockState.getDirectSignal(level, blockPos, signalDirection)
-                : blockState.getSignal(level, blockPos, signalDirection);
-    }
-
-    private static BlockState maximallyPoweredState(BlockState blockState) {
-        BlockState poweredState = blockState;
-        if (poweredState.hasProperty(BlockStateProperties.POWERED)) {
-            poweredState = poweredState.setValue(BlockStateProperties.POWERED, true);
-        }
-        if (poweredState.hasProperty(BlockStateProperties.LIT)) {
-            poweredState = poweredState.setValue(BlockStateProperties.LIT, true);
-        }
-        if (poweredState.hasProperty(BlockStateProperties.POWER)) {
-            poweredState = poweredState.setValue(BlockStateProperties.POWER, MAX_SIGNAL_POWER);
-        }
-        return poweredState;
     }
 
     private static List<AABB> createBoxes(LongSet positions) {

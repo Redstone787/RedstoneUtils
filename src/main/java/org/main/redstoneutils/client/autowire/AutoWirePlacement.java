@@ -1,6 +1,7 @@
 package org.main.redstoneutils.client.autowire;
 
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.MultiPlayerGameMode;
 import net.minecraft.client.player.LocalPlayer;
@@ -52,6 +53,7 @@ public final class AutoWirePlacement {
         initialized = true;
 
         ServerTickEvents.END_SERVER_TICK.register(AutoWirePlacement::tickPendingIntegratedPlacements);
+        ServerLifecycleEvents.SERVER_STOPPED.register(ignored -> pendingIntegratedPlacements.clear());
     }
 
     public static boolean placeOnTop(Level level, BlockPos supportBlockPos, PlaceableBlock block) {
@@ -205,6 +207,10 @@ public final class AutoWirePlacement {
         }
 
         ServerPlayer serverPlayer = playerUuid == null ? null : serverLevel.getServer().getPlayerList().getPlayer(playerUuid);
+        if (serverPlayer == null || !hasPlacementItem(serverPlayer, item)) {
+            reportFailure("missing_item", blockState);
+            return;
+        }
         if (!serverLevel.setBlockAndUpdate(blockPos, blockState)) {
             reportFailure("placement_rejected", blockState);
             return;
@@ -213,6 +219,38 @@ public final class AutoWirePlacement {
         refreshNearbyRedstoneWires(serverLevel, blockPos, serverPlayer);
         if (!serverLevel.getBlockState(blockPos).is(blockState.getBlock())) {
             reportFailure("cannot_survive", blockState);
+            return;
+        }
+        consumePlacementItem(serverPlayer, item);
+    }
+
+    private static boolean hasPlacementItem(ServerPlayer player, Item item) {
+        if (player.hasInfiniteMaterials()) return true;
+        Inventory inventory = player.getInventory();
+        for (ItemStack stack : inventory.getNonEquipmentItems()) {
+            if (!stack.isEmpty() && stack.is(item)) return true;
+        }
+        ItemStack offhand = inventory.getItem(Inventory.SLOT_OFFHAND);
+        return !offhand.isEmpty() && offhand.is(item);
+    }
+
+    private static void consumePlacementItem(ServerPlayer player, Item item) {
+        if (player.hasInfiniteMaterials()) return;
+        Inventory inventory = player.getInventory();
+        for (int slot = 0; slot < inventory.getNonEquipmentItems().size(); slot++) {
+            ItemStack stack = inventory.getItem(slot);
+            if (!stack.isEmpty() && stack.is(item)) {
+                stack.shrink(1);
+                inventory.setChanged();
+                player.containerMenu.broadcastChanges();
+                return;
+            }
+        }
+        ItemStack offhand = inventory.getItem(Inventory.SLOT_OFFHAND);
+        if (!offhand.isEmpty() && offhand.is(item)) {
+            offhand.shrink(1);
+            inventory.setChanged();
+            player.containerMenu.broadcastChanges();
         }
     }
 

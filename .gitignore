@@ -9,6 +9,21 @@ logs/
 
 *.class
 .DS_Store
+TODO.txt
+errors.txt
 
 # Local-only test commands and test logic (never shipped or committed)
 .local-tests/
+
+# Accidental Minecraft runtime output when the game is started from the project root
+/command_history.txt
+/config/
+/crash-reports/
+/data/
+/downloads/
+/options.txt
+/resourcepacks/
+/saves/
+/screenshots/
+/servers.dat
+/usercache.json

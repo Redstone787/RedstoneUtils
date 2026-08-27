@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "id": "redstoneutils",
   "version": "${version}",
-  "name": "RedstoneUtils",
-  "description": "Client and server Redstone utility tools for creative development.",
+  "name": "Redstone Utils",
+  "description": "Client and server tools for designing, inspecting, and debugging Redstone systems.",
   "authors": [],
   "contact": {
     "repo": "https://github.com/Redstone787/RedstoneUtils"

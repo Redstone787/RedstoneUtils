@@ -32,11 +32,14 @@ public final class ConfigScreen extends Screen {
 
     private static final int PANEL_WIDTH = 600;
     private static final int PANEL_HEIGHT = 430;
-    private static final int HEADER = 80;
-    private static final int FOOTER = 42;
-    private static final int ROW_HEIGHT = 66;
+    private static final int HEADER = 84;
+    private static final int COMPACT_HEADER = 112;
+    private static final int FOOTER = 46;
+    private static final int ROW_HEIGHT = 72;
+    private static final int COMPACT_ROW_HEIGHT = 78;
     private static final int VALUE_WIDTH = 126;
     private static final int RESET_WIDTH = 24;
+    private static final int ROW_ACTION_INSET = 8;
     private static final int BUTTON_HEIGHT = 24;
 
     private final List<Option> options = createOptions();
@@ -59,9 +62,9 @@ public final class ConfigScreen extends Screen {
         Layout layout = layout();
         searchBox = addWidget(new EditBox(
                 font,
-                layout.x + 242,
-                layout.y + 45,
-                210,
+                layout.searchX(),
+                layout.searchY(),
+                layout.searchWidth(),
                 22,
                 Component.translatable("config.redstoneutils.search")
         ));
@@ -74,32 +77,47 @@ public final class ConfigScreen extends Screen {
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float deltaTicks) {
+
         Layout layout = layout();
         List<Option> visible = visibleOptions();
         scroll = Mth.clamp(scroll, 0, maxScroll(layout, visible));
+
         RedstoneUi.drawPanel(graphics, layout.x, layout.y, layout.width, layout.height);
         graphics.text(font, title, layout.x + 14, layout.y + 10, RedstoneUi.TEXT_COLOR, false);
         graphics.text(font, Component.translatable("screen.redstoneutils.config.profile", RedstoneUtilsConfig.activeProfile()), layout.x + 14, layout.y + 27, RedstoneUi.MUTED_TEXT_COLOR, false);
-        drawButton(graphics, category.label(), layout.x + 14, layout.y + 45, 216, 22,
-                RedstoneUi.contains(mouseX, mouseY, layout.x + 14, layout.y + 45, 216, 22));
+        drawButton(graphics, category.label(), layout.categoryX(), layout.categoryY(), layout.categoryWidth(), 22,
+                RedstoneUi.contains(mouseX, mouseY, layout.categoryX(), layout.categoryY(), layout.categoryWidth(), 22));
+        searchBox.setX(layout.searchX());
+        searchBox.setY(layout.searchY());
+        searchBox.setSize(layout.searchWidth(), 22);
         searchBox.extractWidgetRenderState(graphics, mouseX, mouseY, deltaTicks);
 
         graphics.enableScissor(layout.contentLeft(), layout.contentTop(), layout.contentRight(), layout.contentBottom());
         for (int index = 0; index < visible.size(); index++) {
+
             Option option = visible.get(index);
-            int rowY = layout.contentTop() + index * ROW_HEIGHT - (int) scroll;
-            if (rowY + ROW_HEIGHT < layout.contentTop() || rowY > layout.contentBottom()) continue;
+            int rowY = layout.contentTop() + index * layout.rowHeight() - (int) scroll;
+            if (rowY + layout.rowHeight() < layout.contentTop() || rowY > layout.contentBottom()) continue;
+
             int color = index % 2 == 0 ? RedstoneUi.ROW_COLOR : RedstoneUi.ROW_ALT_COLOR;
-            graphics.fill(layout.contentLeft(), rowY + 2, layout.contentRight(), rowY + ROW_HEIGHT - 3, color);
-            graphics.outline(layout.contentLeft(), rowY + 2, layout.contentWidth(), ROW_HEIGHT - 5, RedstoneUi.PANEL_BORDER_COLOR);
+
+            graphics.fill(layout.contentLeft(), rowY + 3, layout.contentRight(), rowY + layout.rowHeight() - 5, color);
+            graphics.outline(layout.contentLeft(), rowY + 3, layout.contentWidth(), layout.rowHeight() - 8, RedstoneUi.PANEL_BORDER_COLOR);
+
             int textX = layout.contentLeft() + 9;
             int textWidth = layout.valueX() - textX - 8;
+
             graphics.text(font, Component.translatable(option.titleKey), textX, rowY + 9, RedstoneUi.TEXT_COLOR, false);
             RedstoneUi.drawWrappedText(graphics, font, Component.translatable(option.descriptionKey).getString(), textX, rowY + 25, textWidth, 2, RedstoneUi.MUTED_TEXT_COLOR);
+
             boolean valueHovered = RedstoneUi.contains(mouseX, mouseY, layout.valueX(), rowY + 8, VALUE_WIDTH, BUTTON_HEIGHT);
+
             drawButton(graphics, option.value.get(), layout.valueX(), rowY + 8, VALUE_WIDTH, BUTTON_HEIGHT, valueHovered);
+
             boolean resetHovered = RedstoneUi.contains(mouseX, mouseY, layout.resetX(), rowY + 8, RESET_WIDTH, BUTTON_HEIGHT);
+
             drawButton(graphics, "↺", layout.resetX(), rowY + 8, RESET_WIDTH, BUTTON_HEIGHT, resetHovered);
+
             if (valueHovered) {
                 graphics.setTooltipForNextFrame(Component.translatable(option.tooltipKey), mouseX, mouseY);
             } else if (resetHovered) {
@@ -110,8 +128,10 @@ public final class ConfigScreen extends Screen {
         drawScrollbar(graphics, layout, visible.size());
 
         int footerY = layout.y + layout.height - 33;
+
         drawButton(graphics, Component.translatable("config.redstoneutils.reset_profile").getString(), layout.x + 14, footerY, 132, 24,
                 RedstoneUi.contains(mouseX, mouseY, layout.x + 14, footerY, 132, 24));
+
         drawButton(graphics, Component.translatable("gui.done").getString(), layout.x + layout.width - 106, footerY, 92, 24,
                 RedstoneUi.contains(mouseX, mouseY, layout.x + layout.width - 106, footerY, 92, 24));
     }
@@ -119,9 +139,10 @@ public final class ConfigScreen extends Screen {
     @Override
     public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
         Layout layout = layout();
-        if (searchBox.mouseClicked(event, doubleClick)) return true;
+        if (super.mouseClicked(event, doubleClick)) return true;
+        clearFocus();
         if (event.button() != InputConstants.MOUSE_BUTTON_LEFT) return true;
-        if (RedstoneUi.contains(event.x(), event.y(), layout.x + 14, layout.y + 45, 216, 22)) {
+        if (RedstoneUi.contains(event.x(), event.y(), layout.categoryX(), layout.categoryY(), layout.categoryWidth(), 22)) {
             category = Category.values()[(category.ordinal() + 1) % Category.values().length];
             scroll = 0;
             click();
@@ -129,7 +150,7 @@ public final class ConfigScreen extends Screen {
         }
         List<Option> visible = visibleOptions();
         for (int index = 0; index < visible.size(); index++) {
-            int rowY = layout.contentTop() + index * ROW_HEIGHT - (int) scroll;
+            int rowY = layout.contentTop() + index * layout.rowHeight() - (int) scroll;
             if (RedstoneUi.contains(event.x(), event.y(), layout.valueX(), rowY + 8, VALUE_WIDTH, BUTTON_HEIGHT)) {
                 visible.get(index).edit.run();
                 click();
@@ -157,13 +178,13 @@ public final class ConfigScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
-        scroll = Mth.clamp(scroll - scrollY * ROW_HEIGHT, 0, maxScroll(layout(), visibleOptions()));
+        Layout layout = layout();
+        scroll = Mth.clamp(scroll - scrollY * layout.rowHeight(), 0, maxScroll(layout, visibleOptions()));
         return true;
     }
 
     @Override
     public boolean keyPressed(KeyEvent event) {
-        if (searchBox.keyPressed(event)) return true;
         if (event.key() == InputConstants.KEY_ESCAPE) {
             onClose();
             return true;
@@ -173,7 +194,7 @@ public final class ConfigScreen extends Screen {
 
     @Override
     public boolean charTyped(CharacterEvent event) {
-        return searchBox.charTyped(event) || super.charTyped(event);
+        return super.charTyped(event);
     }
 
     @Override public boolean isPauseScreen() { return false; }
@@ -189,7 +210,7 @@ public final class ConfigScreen extends Screen {
     }
 
     private void drawScrollbar(GuiGraphicsExtractor graphics, Layout layout, int rows) {
-        int total = rows * ROW_HEIGHT;
+        int total = rows * layout.rowHeight();
         if (total <= layout.contentHeight()) return;
         int x = layout.contentRight() + 4;
         graphics.fill(x, layout.contentTop(), x + 5, layout.contentBottom(), RedstoneUi.SCROLLBAR_TRACK_COLOR);
@@ -199,7 +220,7 @@ public final class ConfigScreen extends Screen {
     }
 
     private double maxScroll(Layout layout, List<Option> visible) {
-        return Math.max(0, visible.size() * ROW_HEIGHT - layout.contentHeight());
+        return Math.max(0, visible.size() * layout.rowHeight() - layout.contentHeight());
     }
 
     private void drawButton(GuiGraphicsExtractor graphics, String label, int x, int y, int width, int height, boolean hovered) {
@@ -224,7 +245,7 @@ public final class ConfigScreen extends Screen {
         AutoWireHandler.reloadFromProfile();
     }
 
-    private static List<Option> createOptions() {
+    private List<Option> createOptions() {
         List<Option> result = new ArrayList<>();
         result.add(toggle(Category.GENERAL, "config.redstoneutils.hud", RedstoneUtilsConfig::isHudOverlayVisible, RedstoneOverlay::setVisible, true));
         result.add(toggle(Category.GENERAL, "config.redstoneutils.status_hud", RedstoneUtilsConfig::isStatusHudVisible, RedstoneUtilsConfig::setStatusHudVisible, true));
@@ -239,7 +260,7 @@ public final class ConfigScreen extends Screen {
         result.add(number(Category.OVERLAYS, "config.redstoneutils.bud_range", 4, 64, 0, () -> (double) RedstoneUtilsConfig.getBudTestRange(), value -> { RedstoneUtilsConfig.setBudTestRange(value.intValue()); BudSwitchOverlay.clear(); }, 8));
         result.add(toggle(Category.OVERLAYS, "config.redstoneutils.sculk", SculkSensorOverlay::isVisible, SculkSensorOverlay::setVisible, false));
         result.add(number(Category.OVERLAYS, "config.redstoneutils.sculk_distance", 16, 256, 0, () -> (double) RedstoneUtilsConfig.getSculkSensorSearchDistance(), value -> { RedstoneUtilsConfig.setSculkSensorSearchDistance(value.intValue()); SculkSensorOverlay.requestRefresh(); }, 96));
-        result.add(toggle(Category.OVERLAYS, "config.redstoneutils.freeze", OverlayFreeze::anyFrozen, ignored -> OverlayFreeze.toggleAll(), false));
+        result.add(toggle(Category.OVERLAYS, "config.redstoneutils.freeze", OverlayFreeze::anyFrozen, OverlayFreeze::setAllFrozen, false));
 
         result.add(choice(Category.ACCESSIBILITY, "config.redstoneutils.palette", RedstoneUtilsConfig.ColorPalette.values(), RedstoneUtilsConfig::getColorPalette, RedstoneUtilsConfig::setColorPalette, RedstoneUtilsConfig.ColorPalette.DEFAULT));
         result.add(color(Category.ACCESSIBILITY, "config.redstoneutils.wire_color", RedstoneUtilsConfig::wirePreviewColor, RedstoneUtilsConfig::setWirePreviewColor, RedstoneUtilsConfig::resetWirePreviewColor));
@@ -248,12 +269,12 @@ public final class ConfigScreen extends Screen {
         result.add(color(Category.ACCESSIBILITY, "config.redstoneutils.sculk_color", RedstoneUtilsConfig::sculkColor, RedstoneUtilsConfig::setSculkColor, RedstoneUtilsConfig::resetSculkColor));
         result.add(number(Category.ACCESSIBILITY, "config.redstoneutils.opacity", 0.1, 1.0, 2, () -> (double) RedstoneUtilsConfig.getOverlayOpacity(), value -> RedstoneUtilsConfig.setOverlayOpacity(value.floatValue()), 0.85));
         result.add(number(Category.ACCESSIBILITY, "config.redstoneutils.line_width", 1, 8, 1, () -> (double) RedstoneUtilsConfig.getOverlayLineWidth(), value -> RedstoneUtilsConfig.setOverlayLineWidth(value.floatValue()), 2));
-        result.add(toggle(Category.ACCESSIBILITY, "config.redstoneutils.through_walls", RedstoneUtilsConfig::renderOverlaysThroughWalls, RedstoneUtilsConfig::setOverlayThroughWalls, true));
+        result.add(toggle(Category.ACCESSIBILITY, "config.redstoneutils.through_walls", RedstoneUtilsConfig::renderOverlaysThroughWalls, RedstoneUtilsConfig::setOverlayThroughWalls, false));
         result.add(choice(Category.ACCESSIBILITY, "config.redstoneutils.popup_anchor", RedstoneUtilsConfig.PopupAnchor.values(), RedstoneUtilsConfig::getPopupAnchor, RedstoneUtilsConfig::setPopupAnchor, RedstoneUtilsConfig.PopupAnchor.TOP_LEFT));
         result.add(number(Category.ACCESSIBILITY, "config.redstoneutils.popup_duration", 1000, 15000, 0, () -> (double) RedstoneUtilsConfig.getPopupDurationMillis(), value -> RedstoneUtilsConfig.setPopupDurationMillis(value.intValue()), 3000));
 
         result.add(number(Category.PERFORMANCE, "config.redstoneutils.overlay_distance", 8, 256, 0, () -> (double) RedstoneUtilsConfig.getOverlayMaxDistance(), value -> RedstoneUtilsConfig.setOverlayMaxDistance(value.intValue()), 128));
-        result.add(number(Category.PERFORMANCE, "config.redstoneutils.sculk_interval", 1, 100, 0, () -> (double) RedstoneUtilsConfig.getSculkRebuildIntervalTicks(), value -> { RedstoneUtilsConfig.setSculkRebuildIntervalTicks(value.intValue()); SculkSensorOverlay.requestRefresh(); }, 5));
+        result.add(number(Category.PERFORMANCE, "config.redstoneutils.sculk_interval", 5, 100, 0, () -> (double) RedstoneUtilsConfig.getSculkRebuildIntervalTicks(), value -> { RedstoneUtilsConfig.setSculkRebuildIntervalTicks(value.intValue()); SculkSensorOverlay.requestRefresh(); }, 20));
         return result;
     }
 
@@ -271,20 +292,20 @@ public final class ConfigScreen extends Screen {
                 }, () -> setter.accept(defaultValue));
     }
 
-    private static Option number(Category category, String key, double min, double max, int decimals,
+    private Option number(Category category, String key, double min, double max, int decimals,
                                  Supplier<Double> getter, Consumer<Double> setter, double defaultValue) {
         return new Option(category, key + ".title", key + ".description", key + ".tooltip",
                 () -> decimals == 0 ? Integer.toString((int) Math.round(getter.get())) : String.format(Locale.ROOT, "% ." + decimals + "f", getter.get()).strip(),
                 () -> Minecraft.getInstance().gui.setScreen(new NumericConfigScreen(
-                        Component.translatable(key + ".title"), min, max, decimals, getter.get(), setter, new ConfigScreen()
+                        Component.translatable(key + ".title"), min, max, decimals, getter.get(), setter, this
                 )), () -> setter.accept(defaultValue));
     }
 
-    private static Option color(Category category, String key, Supplier<Integer> getter, java.util.function.IntConsumer setter, Runnable reset) {
+    private Option color(Category category, String key, Supplier<Integer> getter, java.util.function.IntConsumer setter, Runnable reset) {
         return new Option(category, key + ".title", key + ".description", key + ".tooltip",
                 () -> String.format(Locale.ROOT, "#%06X", getter.get() & 0xFFFFFF),
                 () -> Minecraft.getInstance().gui.setScreen(new ColorConfigScreen(
-                        Component.translatable(key + ".title"), getter.get(), setter, new ConfigScreen()
+                        Component.translatable(key + ".title"), getter.get(), setter, this
                 )), reset);
     }
 
@@ -303,13 +324,22 @@ public final class ConfigScreen extends Screen {
                           Supplier<String> value, Runnable edit, Runnable reset) { }
 
     private record Layout(int x, int y, int width, int height) {
+        boolean compact() { return width < 540; }
+        int headerHeight() { return compact() ? COMPACT_HEADER : HEADER; }
+        int rowHeight() { return compact() ? COMPACT_ROW_HEIGHT : ROW_HEIGHT; }
+        int categoryX() { return x + 14; }
+        int categoryY() { return y + 45; }
+        int categoryWidth() { return compact() ? width - 28 : 216; }
+        int searchX() { return compact() ? x + 14 : x + 242; }
+        int searchY() { return compact() ? y + 77 : y + 45; }
+        int searchWidth() { return compact() ? width - 28 : 210; }
         int contentLeft() { return x + 14; }
         int contentRight() { return x + width - 21; }
-        int contentTop() { return y + HEADER; }
+        int contentTop() { return y + headerHeight(); }
         int contentBottom() { return y + height - FOOTER; }
         int contentWidth() { return contentRight() - contentLeft(); }
         int contentHeight() { return contentBottom() - contentTop(); }
-        int valueX() { return contentRight() - RESET_WIDTH - 6 - VALUE_WIDTH; }
-        int resetX() { return contentRight() - RESET_WIDTH; }
+        int valueX() { return resetX() - 6 - VALUE_WIDTH; }
+        int resetX() { return contentRight() - ROW_ACTION_INSET - RESET_WIDTH; }
     }
 }

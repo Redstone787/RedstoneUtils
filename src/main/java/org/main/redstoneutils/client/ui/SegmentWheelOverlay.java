@@ -14,9 +14,9 @@ final class SegmentWheelOverlay {
 
     private static final Object LOCK = new Object();
 
-    private static final int OUTER_RADIUS = 160;
-    private static final int INNER_RADIUS = 32;
-    private static final int ICON_SIZE = 48;
+    private static final int MAX_OUTER_RADIUS = 160;
+    private static final int MAX_INNER_RADIUS = 32;
+    private static final int MAX_ICON_SIZE = 48;
     private static final int SELECTED_COLOR = 0xE66A707A;
     private static final int ACTIVE_COLOR = 0xE68A909A;
     private static final int SEGMENT_COLOR = 0xC02B2D31;
@@ -132,8 +132,11 @@ final class SegmentWheelOverlay {
         Minecraft minecraft = Minecraft.getInstance();
         int centerX = graphics.guiWidth() / 2;
         int centerY = graphics.guiHeight() / 2;
+        int outerRadius = Math.min(MAX_OUTER_RADIUS, Math.max(48, (Math.min(graphics.guiWidth(), graphics.guiHeight()) - 16) / 2));
+        int innerRadius = Math.min(MAX_INNER_RADIUS, Math.max(18, outerRadius / 5));
+        int iconSize = Math.min(MAX_ICON_SIZE, Math.max(20, outerRadius / 3));
 
-        updateSelection(minecraft, centerX, centerY, currentSegmentCount);
+        updateSelection(minecraft, centerX, centerY, currentSegmentCount, innerRadius, outerRadius);
 
         CircleSegment selectedSegment;
         synchronized (LOCK) {
@@ -141,13 +144,13 @@ final class SegmentWheelOverlay {
         }
 
         graphics.nextStratum();
-        fillRing(graphics, centerX + 2, centerY + 2, INNER_RADIUS, OUTER_RADIUS, SHADOW_COLOR);
-        fillSegments(graphics, centerX, centerY, currentSegmentCount, selectedSegment, currentHighlightedSegment);
-        fillCircle(graphics, centerX, centerY, INNER_RADIUS, CENTER_COLOR);
-        drawSeparators(graphics, centerX, centerY, currentSegmentCount);
-        drawCircleOutline(graphics, centerX, centerY, INNER_RADIUS, 2, CENTER_BORDER_COLOR);
-        drawCircleOutline(graphics, centerX, centerY, OUTER_RADIUS, 2, CENTER_BORDER_COLOR);
-        renderTextures(graphics, centerX, centerY, currentSegmentCount, currentTextures);
+        fillRing(graphics, centerX + 2, centerY + 2, innerRadius, outerRadius, SHADOW_COLOR);
+        fillSegments(graphics, centerX, centerY, innerRadius, outerRadius, currentSegmentCount, selectedSegment, currentHighlightedSegment);
+        fillCircle(graphics, centerX, centerY, innerRadius, CENTER_COLOR);
+        drawSeparators(graphics, centerX, centerY, innerRadius, outerRadius, currentSegmentCount);
+        drawCircleOutline(graphics, centerX, centerY, innerRadius, 2, CENTER_BORDER_COLOR);
+        drawCircleOutline(graphics, centerX, centerY, outerRadius, 2, CENTER_BORDER_COLOR);
+        renderTextures(graphics, centerX, centerY, innerRadius, outerRadius, iconSize, currentSegmentCount, currentTextures);
     }
 
     private static void resetSelection() {
@@ -156,12 +159,12 @@ final class SegmentWheelOverlay {
         wasLeftMouseDown = false;
     }
 
-    private static void updateSelection(Minecraft minecraft, int centerX, int centerY, int segmentCount) {
+    private static void updateSelection(Minecraft minecraft, int centerX, int centerY, int segmentCount, int innerRadius, int outerRadius) {
         double mouseX = minecraft.mouseHandler.getScaledXPos(minecraft.getWindow());
         double mouseY = minecraft.mouseHandler.getScaledYPos(minecraft.getWindow());
         double dx = mouseX - centerX;
         double dy = mouseY - centerY;
-        CircleSegment hovered = getSegmentAt(dx, dy, segmentCount);
+        CircleSegment hovered = getSegmentAt(dx, dy, innerRadius, outerRadius, segmentCount);
         boolean leftMouseDown = minecraft.mouseHandler.isLeftPressed();
 
         synchronized (LOCK) {
@@ -175,23 +178,23 @@ final class SegmentWheelOverlay {
         }
     }
 
-    private static CircleSegment getSegmentAt(double dx, double dy, int segmentCount) {
+    private static CircleSegment getSegmentAt(double dx, double dy, int innerRadius, int outerRadius, int segmentCount) {
         double distanceSquared = dx * dx + dy * dy;
-        if (distanceSquared < INNER_RADIUS * INNER_RADIUS) return CircleSegment.NONE;
-        if (distanceSquared > OUTER_RADIUS * OUTER_RADIUS) return CircleSegment.NONE;
+        if (distanceSquared < innerRadius * innerRadius) return CircleSegment.NONE;
+        if (distanceSquared > outerRadius * outerRadius) return CircleSegment.NONE;
 
         return CircleSegment.fromIndex(segmentIndexForVector(dx, dy, segmentCount));
     }
 
-    private static void fillSegments(GuiGraphicsExtractor graphics, int centerX, int centerY, int segmentCount, CircleSegment selectedSegment, CircleSegment highlightedSegment) {
-        int innerSquared = INNER_RADIUS * INNER_RADIUS;
-        int outerSquared = OUTER_RADIUS * OUTER_RADIUS;
+    private static void fillSegments(GuiGraphicsExtractor graphics, int centerX, int centerY, int innerRadius, int outerRadius, int segmentCount, CircleSegment selectedSegment, CircleSegment highlightedSegment) {
+        int innerSquared = innerRadius * innerRadius;
+        int outerSquared = outerRadius * outerRadius;
 
-        for (int y = -OUTER_RADIUS; y <= OUTER_RADIUS; y++) {
+        for (int y = -outerRadius; y <= outerRadius; y++) {
             int runStart = Integer.MIN_VALUE;
             int runColor = 0;
 
-            for (int x = -OUTER_RADIUS; x <= OUTER_RADIUS; x++) {
+            for (int x = -outerRadius; x <= outerRadius; x++) {
                 int distanceSquared = x * x + y * y;
                 int color = 0;
 
@@ -211,7 +214,7 @@ final class SegmentWheelOverlay {
             }
 
             if (runColor != 0) {
-                graphics.fill(centerX + runStart, centerY + y, centerX + OUTER_RADIUS + 1, centerY + y + 1, runColor);
+                graphics.fill(centerX + runStart, centerY + y, centerX + outerRadius + 1, centerY + y + 1, runColor);
             }
         }
     }
@@ -222,7 +225,7 @@ final class SegmentWheelOverlay {
         return segmentIndex % 2 == 0 ? SEGMENT_COLOR : ALTERNATE_SEGMENT_COLOR;
     }
 
-    private static void drawSeparators(GuiGraphicsExtractor graphics, int centerX, int centerY, int segmentCount) {
+    private static void drawSeparators(GuiGraphicsExtractor graphics, int centerX, int centerY, int innerRadius, int outerRadius, int segmentCount) {
         if (segmentCount <= 1) return;
 
         double segmentAngle = Math.PI * 2.0D / segmentCount;
@@ -232,7 +235,7 @@ final class SegmentWheelOverlay {
             double sin = Math.sin(angle);
             double cos = Math.cos(angle);
 
-            for (int radius = INNER_RADIUS + 1; radius < OUTER_RADIUS; radius++) {
+            for (int radius = innerRadius + 1; radius < outerRadius; radius++) {
                 int x = centerX + (int) Math.round(sin * radius);
                 int y = centerY - (int) Math.round(cos * radius);
                 graphics.fill(x, y, x + 1, y + 1, SEPARATOR_COLOR);
@@ -240,11 +243,11 @@ final class SegmentWheelOverlay {
         }
     }
 
-    private static void renderTextures(GuiGraphicsExtractor graphics, int centerX, int centerY, int segmentCount, List<Identifier> textures) {
+    private static void renderTextures(GuiGraphicsExtractor graphics, int centerX, int centerY, int innerRadius, int outerRadius, int iconSize, int segmentCount, List<Identifier> textures) {
         if (textures.isEmpty()) return;
 
         double segmentAngle = Math.PI * 2.0D / segmentCount;
-        int iconRadius = (INNER_RADIUS + OUTER_RADIUS) / 2;
+        int iconRadius = (innerRadius + outerRadius) / 2;
 
         for (int segment = 0; segment < segmentCount; segment++) {
             if (segment >= textures.size()) return;
@@ -253,9 +256,9 @@ final class SegmentWheelOverlay {
             if (texture == null) continue;
 
             double angle = (segment + 0.5D) * segmentAngle;
-            int iconX = centerX + (int) Math.round(Math.sin(angle) * iconRadius) - ICON_SIZE / 2;
-            int iconY = centerY - (int) Math.round(Math.cos(angle) * iconRadius) - ICON_SIZE / 2;
-            graphics.blit(RenderPipelines.GUI_TEXTURED, texture, iconX, iconY, 0.0F, 0.0F, ICON_SIZE, ICON_SIZE, ICON_SIZE, ICON_SIZE);
+            int iconX = centerX + (int) Math.round(Math.sin(angle) * iconRadius) - iconSize / 2;
+            int iconY = centerY - (int) Math.round(Math.cos(angle) * iconRadius) - iconSize / 2;
+            graphics.blit(RenderPipelines.GUI_TEXTURED, texture, iconX, iconY, 0.0F, 0.0F, iconSize, iconSize, MAX_ICON_SIZE, MAX_ICON_SIZE);
         }
     }
 
