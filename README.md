@@ -10,7 +10,7 @@ Redstone Utils is a Fabric mod for Minecraft 26.2 with client-side workflow tool
 | --- | --- |
 | Mod ID | `redstoneutils` |
 | Display Name | Redstone Utils |
-| Version | `1.3.0` |
+| Version | `1.3.1` |
 | Minecraft | `26.2` |
 | Fabric Loader | `>=0.19.3` |
 | Fabric API | `0.154.2+26.2` |
@@ -174,7 +174,7 @@ Overlay visibility is controlled through its own command:
 
 `/overlay` without a subcommand toggles all overlays. The radial AutoWire menu keeps the configured forward, backward, left, and right movement keys active while it is open.
 
-The BUD switch overlay continuously searches a configurable spherical range around the player for armed quasi-connectivity BUD states. A piston, dispenser, or dropper is highlighted red only when its current state disagrees with the power received through the block space above it and a normal adjacent input is not responsible. Blocked pistons that could not react to an update are excluded. Active blocks supplying the stale quasi-power are highlighted yellow; a BUD waiting to deactivate can appear without a yellow source because its power has already disappeared. The test range can be changed in `/redstoneutils config`.
+The BUD switch overlay continuously searches a configurable spherical range around the player for armed quasi-connectivity BUD states. A piston, dispenser, or dropper is highlighted red only when its current state disagrees with the power received through the block space above it and a normal adjacent input is not responsible. A retracted, quasi-powered piston remains an armed BUD even when its current obstruction cannot be pushed: removing or changing that obstruction is itself a block update that can let the piston react. Active blocks supplying the stale quasi-power are highlighted yellow; a BUD waiting to deactivate can appear without a yellow source because its power has already disappeared. The test range can be changed in `/redstoneutils config`.
 
 ### Toolbox and Status HUD
 

@@ -18,7 +18,6 @@ import net.minecraft.gizmos.GizmoStyle;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.DispenserBlock;
 import net.minecraft.world.level.block.piston.PistonBaseBlock;
-import net.minecraft.world.level.block.piston.PistonStructureResolver;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
@@ -179,27 +178,17 @@ public final class BudSwitchOverlay {
     private static boolean isArmedBud(Level level, BlockPos componentPos, BlockState componentState) {
         if (componentState.getBlock() instanceof PistonBaseBlock) {
             Direction facing = componentState.getValue(PistonBaseBlock.FACING);
-            if (hasDirectPistonPower(level, componentPos, facing)) {
-                return false;
-            }
-
+            boolean directlyPowered = hasDirectPistonPower(level, componentPos, facing);
             boolean quasiPowered = hasQuasiPistonPower(level, componentPos);
             boolean extended = componentState.getValue(PistonBaseBlock.EXTENDED);
-            if (quasiPowered == extended) {
-                return false;
-            }
-
-            return extended || new PistonStructureResolver(level, componentPos, facing, true).resolve();
+            return BudStateDetector.isArmedQuasiState(directlyPowered, quasiPowered, extended);
         }
 
         if (componentState.getBlock() instanceof DispenserBlock) {
-            if (level.hasNeighborSignal(componentPos)) {
-                return false;
-            }
-
+            boolean directlyPowered = level.hasNeighborSignal(componentPos);
             boolean quasiPowered = level.hasNeighborSignal(componentPos.above());
             boolean triggered = componentState.getValue(DispenserBlock.TRIGGERED);
-            return quasiPowered != triggered;
+            return BudStateDetector.isArmedQuasiState(directlyPowered, quasiPowered, triggered);
         }
 
         return false;
