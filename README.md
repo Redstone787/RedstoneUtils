@@ -6,7 +6,7 @@
 
 Redstone Utils is a Fabric mod for Minecraft 26.2 with client-side tools for designing, inspecting, and debugging Redstone systems and optional server-side implementations for world-editing features.
 
-> **Pre-release:** public-release preparation is still in progress. No public build is available yet.
+> **Public alpha:** `2.0.0-alpha.1` is the first public test release. Configuration, commands, and behavior may still change before the first stable release. Download it from the [GitHub release page](https://github.com/Redstone787/RedstoneUtils/releases/tag/v2.0.0-alpha.1-mc26.2).
 
 ## Highlights
 
@@ -51,7 +51,7 @@ Waterproof Redstone is intentionally available only as a server gamerule and def
 
 ## Documentation
 
-The full installation, command, AutoWire, clock, overlay, macro, profile, configuration, server, privacy, and troubleshooting documentation lives in the versioned [Wiki source](docs/wiki/Home.md). It can be synchronized to GitHub Wiki with `scripts/publish-wiki.sh` once GitHub enables Wiki for this private repository or the repository is deliberately made public.
+The full installation, command, AutoWire, clock, overlay, macro, profile, configuration, server, privacy, and troubleshooting documentation is available in the [GitHub Wiki](https://github.com/Redstone787/RedstoneUtils/wiki). Its versioned source remains in [`docs/wiki`](docs/wiki/Home.md), and maintainers can publish it with `scripts/publish-wiki.sh`.
 
 ## Building
 
@@ -71,6 +71,6 @@ Publisher and maintainer: **Redstone787**.
 
 ## License and notices
 
-Source code is available under the [Mozilla Public License 2.0](LICENSE). See [NOTICE.md](NOTICE.md), [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), [PRIVACY.md](PRIVACY.md), and the [asset provenance record](docs/ASSET_PROVENANCE.md) for additional information. MPL-2.0 permits use, modification, and distribution while requiring covered source changes and notices to remain available; it does not grant rights to contributor names, project names, or logos.
+Source code is available under the [Mozilla Public License 2.0](LICENSE). See [CHANGELOG.md](CHANGELOG.md), [NOTICE.md](NOTICE.md), [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), [PRIVACY.md](PRIVACY.md), and the [asset provenance record](docs/ASSET_PROVENANCE.md) for additional information. MPL-2.0 permits use, modification, and distribution while requiring covered source changes and notices to remain available; it does not grant rights to contributor names, project names, or logos.
 
 NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.
