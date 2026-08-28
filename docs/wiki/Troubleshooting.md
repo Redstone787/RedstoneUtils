@@ -2,11 +2,11 @@
 
 ## The server backend is unavailable
 
-Confirm that the same compatible Redstone Labworks, Fabric Loader, and Fabric API versions are installed on both client and server. Client-only features still work, but world-editing/server commands will be unavailable or use limited fallbacks.
+Confirm that the same compatible Redstone Utils, Fabric Loader, and Fabric API versions are installed on both client and server. Client-only features still work, but world-editing/server commands will be unavailable or use limited fallbacks.
 
 ## A command conflicts with another mod/plugin
 
-Use the canonical `/redstonelabworks ...` form. Short command roots exist for convenience and are more likely to collide.
+Use the canonical `/redstone_utils ...` form. Short command roots exist for convenience and are more likely to collide.
 
 ## AutoWire placement was denied
 

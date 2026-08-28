@@ -1,6 +1,6 @@
 # Server Administration
 
-The server creates `config/redstonelabworks-server.json` on first start. Restart the server after changing it.
+The server creates `config/redstone_utils-server.json` on first start. Restart the server after changing it.
 
 ```json
 {
@@ -25,12 +25,12 @@ Permission values are `OP_OR_CREATIVE`, `OP_ONLY`, `CREATIVE_ONLY`, `EVERYONE`, 
 Waterproof Redstone is controlled exclusively by the server gamerule:
 
 ```mcfunction
-/gamerule redstonelabworks:waterproof_redstone true
+/gamerule redstone_utils:waterproof_redstone true
 ```
 
 It defaults to `false`. When enabled, water does not replace protected Redstone components, including dust, torches, repeaters, comparators, levers, tripwire/hooks, buttons, pressure plates, and relevant rails. Flowing water, player buckets, and dispenser buckets are covered.
 
-Modpacks can extend the protected set through the `redstonelabworks:waterproof_redstone_components` block tag. The implementation does not otherwise change Redstone neighbor updates, scheduled ticks, quasi-connectivity, or BUD behavior.
+Modpacks can extend the protected set through the `redstone_utils:waterproof_redstone_components` block tag. The implementation does not otherwise change Redstone neighbor updates, scheduled ticks, quasi-connectivity, or BUD behavior.
 
 ## Shared history
 

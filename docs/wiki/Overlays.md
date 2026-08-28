@@ -1,6 +1,6 @@
 # Overlays
 
-Redstone Labworks includes wire, BUD, and sculk overlays. They can be toggled independently with `/overlay`, through the toolbox, or in configuration.
+Redstone Utils includes wire, BUD, and sculk overlays. They can be toggled independently with `/overlay`, through the toolbox, or in configuration.
 
 ## Wire preview
 

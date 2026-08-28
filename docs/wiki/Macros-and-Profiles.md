@@ -8,7 +8,7 @@ When a server/world profile is first created, settings and macros are copied fro
 
 ## Macro Manager
 
-Open it with `/macro`, `/redstonelabworks macro`, or the toolbox. Macros support:
+Open it with `/macro`, `/redstone_utils macro`, or the toolbox. Macros support:
 
 - command aliases;
 - keyboard or mouse bindings;
@@ -19,7 +19,7 @@ Open it with `/macro`, `/redstonelabworks macro`, or the toolbox. Macros support
 The default export path is:
 
 ```text
-config/redstonelabworks_macros_export.json
+config/redstone_utils_macros_export.json
 ```
 
 Invalid, reserved, self-referencing, conflicting, or duplicate aliases/bindings are skipped or sanitized. Imported macros receive new IDs.

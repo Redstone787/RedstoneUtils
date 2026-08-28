@@ -95,9 +95,9 @@ publishing {
             artifactId = project.archives_base_name
             from components.java
             pom {
-                name = "Redstone Labworks"
+                name = "Redstone Utils"
                 description = "Client and server tools for designing, inspecting, and debugging Redstone systems."
-                url = "https://github.com/Redstone787/RedstoneLabworks"
+                url = "https://github.com/Redstone787/RedstoneUtils"
                 licenses {
                     license {
                         name = "Mozilla Public License 2.0"
@@ -113,9 +113,9 @@ publishing {
                     }
                 }
                 scm {
-                    connection = "scm:git:https://github.com/Redstone787/RedstoneLabworks.git"
-                    developerConnection = "scm:git:ssh://git@github.com/Redstone787/RedstoneLabworks.git"
-                    url = "https://github.com/Redstone787/RedstoneLabworks"
+                    connection = "scm:git:https://github.com/Redstone787/RedstoneUtils.git"
+                    developerConnection = "scm:git:ssh://git@github.com/Redstone787/RedstoneUtils.git"
+                    url = "https://github.com/Redstone787/RedstoneUtils"
                 }
             }
         }

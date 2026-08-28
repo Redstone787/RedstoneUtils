@@ -1,5 +1,5 @@
 name: Bug report
-description: Report a reproducible problem in Redstone Labworks.
+description: Report a reproducible problem in Redstone Utils.
 title: "[Bug]: "
 labels: [bug]
 body:
@@ -9,7 +9,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: Redstone Labworks version
+      label: Redstone Utils version
       placeholder: e.g. 2.0.0
     validations:
       required: true

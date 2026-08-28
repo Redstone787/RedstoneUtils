@@ -1,4 +1,4 @@
-# Contributing to Redstone Labworks
+# Contributing to Redstone Utils
 
 Thank you for considering a contribution. By participating, you agree to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 

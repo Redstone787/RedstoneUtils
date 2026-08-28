@@ -1,4 +1,4 @@
-**Redstone Labworks**
+**Redstone Utils**
 
 - [Home](Home.md)
 - [Installation](Installation.md)
@@ -15,6 +15,6 @@
 
 ---
 
-- [Source repository](https://github.com/Redstone787/RedstoneLabworks)
-- [Security policy](https://github.com/Redstone787/RedstoneLabworks/blob/main/SECURITY.md)
-- [License](https://github.com/Redstone787/RedstoneLabworks/blob/main/LICENSE)
+- [Source repository](https://github.com/Redstone787/RedstoneUtils)
+- [Security policy](https://github.com/Redstone787/RedstoneUtils/blob/main/SECURITY.md)
+- [License](https://github.com/Redstone787/RedstoneUtils/blob/main/LICENSE)

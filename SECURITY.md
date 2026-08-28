@@ -11,7 +11,7 @@ Only the latest maintained version receives security fixes. A public release has
 
 ## Reporting a vulnerability
 
-Do not disclose a suspected vulnerability in a public issue, discussion, pull request, or chat log. Use [GitHub private vulnerability reporting](https://github.com/Redstone787/RedstoneLabworks/security/advisories/new) and include:
+Do not disclose a suspected vulnerability in a public issue, discussion, pull request, or chat log. Use [GitHub private vulnerability reporting](https://github.com/Redstone787/RedstoneUtils/security/advisories/new) and include:
 
 - the affected version or commit;
 - a minimal reproduction or proof of concept;

@@ -6,7 +6,7 @@
 set -euo pipefail
 
 repository_root=$(git rev-parse --show-toplevel)
-wiki_remote=${1:-https://github.com/Redstone787/RedstoneLabworks.wiki.git}
+wiki_remote=${1:-https://github.com/Redstone787/RedstoneUtils.wiki.git}
 wiki_checkout=$(mktemp -d)
 trap 'rm -rf "$wiki_checkout"' EXIT
 

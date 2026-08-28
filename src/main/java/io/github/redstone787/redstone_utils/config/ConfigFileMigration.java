@@ -1,0 +1,49 @@
+/*
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
+package io.github.redstone787.redstone_utils.config;
+
+import io.github.redstone787.redstone_utils.RedstoneUtils;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+/** Copies pre-rename configuration into the new namespace without deleting the original. */
+public final class ConfigFileMigration {
+
+    private ConfigFileMigration() {
+    }
+
+    public static void copyLegacyIfNeeded(Path target, String... legacyFileNames) {
+        if (target == null || legacyFileNames == null || Files.exists(target)) return;
+
+        for (String legacyFileName : legacyFileNames) {
+            if (legacyFileName == null || legacyFileName.isBlank()) continue;
+
+            Path legacy = target.resolveSibling(legacyFileName);
+            if (!Files.isRegularFile(legacy)) continue;
+
+            try {
+                Files.createDirectories(target.toAbsolutePath().getParent());
+                Files.copy(legacy, target);
+                copyBackupIfPresent(legacy, target);
+                RedstoneUtils.LOGGER.info("Copied legacy configuration {} to {}; the original was preserved", legacy, target);
+            } catch (IOException exception) {
+                RedstoneUtils.LOGGER.error("Could not copy legacy configuration {} to {}", legacy, target, exception);
+            }
+            return;
+        }
+    }
+
+    private static void copyBackupIfPresent(Path legacy, Path target) throws IOException {
+        Path legacyBackup = legacy.resolveSibling(legacy.getFileName() + ".bak");
+        Path targetBackup = target.resolveSibling(target.getFileName() + ".bak");
+        if (Files.isRegularFile(legacyBackup) && !Files.exists(targetBackup)) {
+            Files.copy(legacyBackup, targetBackup);
+        }
+    }
+}

@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="src/main/resources/assets/redstonelabworks/icon.png" alt="Redstone Labworks logo" width="220">
+  <img src="src/main/resources/assets/redstone_utils/icon.png" alt="Redstone Utils logo" width="220">
 </p>
 
-# Redstone Labworks
+# Redstone Utils
 
-Redstone Labworks is a Fabric mod for Minecraft 26.2 with client-side tools for designing, inspecting, and debugging Redstone systems and optional server-side implementations for world-editing features.
+Redstone Utils is a Fabric mod for Minecraft 26.2 with client-side tools for designing, inspecting, and debugging Redstone systems and optional server-side implementations for world-editing features.
 
-> **Pre-release:** the rename and public-release preparation are still in progress. No public build is available yet.
+> **Pre-release:** public-release preparation is still in progress. No public build is available yet.
 
 ## Highlights
 
@@ -21,7 +21,7 @@ Redstone Labworks is a Fabric mod for Minecraft 26.2 with client-side tools for 
 
 | Component | Version |
 | --- | --- |
-| Mod ID | `redstonelabworks` |
+| Mod ID | `redstone_utils` |
 | Development version | `2.0.0-alpha.1` |
 | Minecraft | `26.2` |
 | Fabric Loader | `>=0.19.3` |
@@ -34,8 +34,8 @@ Install the mod on both client and server for all features. Client-only installa
 ## Quick start
 
 ```mcfunction
-/redstonelabworks
-/redstonelabworks config
+/redstone_utils
+/redstone_utils config
 /autowire normal
 /overlay bud true
 /clock 2t
@@ -46,7 +46,7 @@ Install the mod on both client and server for all features. Client-only installa
 Waterproof Redstone is intentionally available only as a server gamerule and defaults to vanilla behavior:
 
 ```mcfunction
-/gamerule redstonelabworks:waterproof_redstone true
+/gamerule redstone_utils:waterproof_redstone true
 ```
 
 ## Documentation

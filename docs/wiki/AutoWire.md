@@ -1,6 +1,6 @@
 # AutoWire
 
-AutoWire can be controlled with `/autowire` or the radial wire menu. The current mode is kept in the active client profile and synchronized with a Redstone Labworks server when available.
+AutoWire can be controlled with `/autowire` or the radial wire menu. The current mode is kept in the active client profile and synchronized with a Redstone Utils server when available.
 
 ## Modes
 

@@ -1,14 +1,14 @@
 # Commands
 
-`/redstonelabworks` is the collision-safe root command and opens the toolbox without arguments. Short convenience roots remain available. If a short name conflicts with another mod or plugin, use its `/redstonelabworks ...` form.
+`/redstone_utils` is the collision-safe root command and opens the toolbox without arguments. Short convenience roots remain available. If a short name conflicts with another mod or plugin, use its `/redstone_utils ...` form.
 
 ## UI and utility commands
 
 ```mcfunction
-/redstonelabworks
-/redstonelabworks toolbox
-/redstonelabworks config
-/redstonelabworks teleport [10-1000]
+/redstone_utils
+/redstone_utils toolbox
+/redstone_utils config
+/redstone_utils teleport [10-1000]
 /macro
 /calc <expression>
 /color <hex-color>
@@ -73,6 +73,6 @@ See [Clock Builder](Clock-Builder.md) for exact supported periods.
 Waterproof Redstone is not a regular command or config toggle:
 
 ```mcfunction
-/gamerule redstonelabworks:waterproof_redstone true
-/gamerule redstonelabworks:waterproof_redstone false
+/gamerule redstone_utils:waterproof_redstone true
+/gamerule redstone_utils:waterproof_redstone false
 ```
