@@ -67,6 +67,8 @@ The remapped mod JAR is written to `build/libs/`. The Gradle wrapper distributio
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting changes. Contributions use MPL-2.0 and require a [Developer Certificate of Origin 1.1](DCO) sign-off. Use the issue forms for ordinary bugs and features, and [private vulnerability reporting](SECURITY.md) for sensitive reports.
 
+Publisher and maintainer: **Redstone787**.
+
 ## License and notices
 
 Source code is available under the [Mozilla Public License 2.0](LICENSE). See [NOTICE.md](NOTICE.md), [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), [PRIVACY.md](PRIVACY.md), and the [asset provenance record](docs/ASSET_PROVENANCE.md) for additional information. MPL-2.0 permits use, modification, and distribution while requiring covered source changes and notices to remain available; it does not grant rights to contributor names, project names, or logos.
