@@ -1,26 +1,30 @@
 {
   "schemaVersion": 1,
-  "id": "redstoneutils",
+  "id": "redstonelabworks",
   "version": "${version}",
-  "name": "Redstone Utils",
+  "name": "Redstone Labworks",
   "description": "Client and server tools for designing, inspecting, and debugging Redstone systems.",
-  "authors": [],
+  "authors": [
+    "Redstone787"
+  ],
   "contact": {
-    "repo": "https://github.com/Redstone787/RedstoneUtils"
+    "homepage": "https://github.com/Redstone787/RedstoneLabworks",
+    "sources": "https://github.com/Redstone787/RedstoneLabworks",
+    "issues": "https://github.com/Redstone787/RedstoneLabworks/issues"
   },
-  "license": "All-Rights-Reserved",
-  "icon": "assets/redstoneutils/icon.png",
+  "license": "MPL-2.0",
+  "icon": "assets/redstonelabworks/icon.png",
   "environment": "*",
   "entrypoints": {
     "client": [
-      "org.main.redstoneutils.client.RedstoneUtilsClient"
+      "io.github.redstone787.redstonelabworks.client.RedstoneLabworksClient"
     ],
     "main": [
-      "org.main.redstoneutils.RedstoneUtils"
+      "io.github.redstone787.redstonelabworks.RedstoneLabworks"
     ]
   },
   "mixins": [
-    "redstoneutils.mixins.json"
+    "redstonelabworks.mixins.json"
   ],
   "depends": {
     "fabricloader": ">=${loader_version}",

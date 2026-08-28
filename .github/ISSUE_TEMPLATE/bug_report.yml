@@ -1,0 +1,56 @@
+name: Bug report
+description: Report a reproducible problem in Redstone Labworks.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Do not include secrets, server addresses, private world data, or vulnerabilities. Use private security reporting for sensitive reports.
+  - type: input
+    id: version
+    attributes:
+      label: Redstone Labworks version
+      placeholder: e.g. 2.0.0
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Minecraft, Fabric Loader, Fabric API, Java, client/server, and operating-system versions.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Minimal reproduction
+      description: List the smallest exact sequence that triggers the problem.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Remove tokens, IP addresses, usernames, file-system paths, and unrelated data before pasting.
+      render: text
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I searched existing issues.
+          required: true
+        - label: I reproduced this without unrelated mods where practical.
+          required: true

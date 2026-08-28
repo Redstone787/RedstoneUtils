@@ -1,5 +1,5 @@
 plugins {
-    id 'net.fabricmc.fabric-loom' version '1.17-SNAPSHOT'
+    id 'net.fabricmc.fabric-loom' version '1.17.20'
     id 'maven-publish'
 }
 
@@ -79,6 +79,13 @@ jar {
     from("LICENSE") {
         rename { "${it}_${licenseArchiveName}" }
     }
+    from("NOTICE.md")
+    from("THIRD_PARTY_NOTICES.md")
+}
+
+tasks.withType(AbstractArchiveTask).configureEach {
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
 }
 
 // configure the maven publication
@@ -87,6 +94,30 @@ publishing {
         create("mavenJava", MavenPublication) {
             artifactId = project.archives_base_name
             from components.java
+            pom {
+                name = "Redstone Labworks"
+                description = "Client and server tools for designing, inspecting, and debugging Redstone systems."
+                url = "https://github.com/Redstone787/RedstoneLabworks"
+                licenses {
+                    license {
+                        name = "Mozilla Public License 2.0"
+                        url = "https://www.mozilla.org/MPL/2.0/"
+                        distribution = "repo"
+                    }
+                }
+                developers {
+                    developer {
+                        id = "Redstone787"
+                        name = "Redstone787"
+                        url = "https://github.com/Redstone787"
+                    }
+                }
+                scm {
+                    connection = "scm:git:https://github.com/Redstone787/RedstoneLabworks.git"
+                    developerConnection = "scm:git:ssh://git@github.com/Redstone787/RedstoneLabworks.git"
+                    url = "https://github.com/Redstone787/RedstoneLabworks"
+                }
+            }
         }
     }
 
