@@ -2,6 +2,14 @@
 
 Notable changes to Redstone Utils are documented in this file.
 
+## [Unreleased]
+
+### Changed
+
+- Replaced repeated Sculk overlay chunk scans with a client-side sensor index updated by chunk and block-entity lifecycle events.
+- Cached Sculk range meshes and render primitives, invalidating them only for relevant sensor, vibration-occlusion, and chunk changes.
+- Limited Sculk mesh work to one sensor per client tick and deduplicated cached surface lines.
+
 ## [2.0.0-alpha.1] - 2026-08-28
 
 First public alpha for Minecraft 26.2.

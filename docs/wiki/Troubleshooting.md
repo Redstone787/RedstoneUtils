@@ -18,7 +18,7 @@ Look in the Minecraft `config` directory for `.bak` and `.corrupt-<timestamp>.ba
 
 ## An overlay appears stale
 
-Unfreeze snapshots, confirm the overlay is enabled, move within its analysis distance, or lower the configured rebuild interval. Large BUD ranges deliberately refresh more slowly.
+Unfreeze snapshots, confirm the overlay is enabled, move within its analysis distance, or lower the configured rebuild interval. Sculk sensors are indexed from loaded client chunks and their cached meshes update after relevant block or chunk changes. Large BUD ranges deliberately refresh more slowly.
 
 ## Reporting a bug
 

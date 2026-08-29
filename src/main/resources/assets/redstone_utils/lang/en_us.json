@@ -122,10 +122,10 @@
   "config.redstone_utils.popup_duration.tooltip": "Click for exact input and a slider.",
   "config.redstone_utils.overlay_distance.title": "Maximum Overlay Distance",
   "config.redstone_utils.overlay_distance.description": "Global analysis cap from 8 to 256 blocks.",
-  "config.redstone_utils.overlay_distance.tooltip": "Limits expensive BUD and sculk searches.",
+  "config.redstone_utils.overlay_distance.tooltip": "Limits BUD searches and the indexed Sculk analysis range.",
   "config.redstone_utils.sculk_interval.title": "Sculk Update Interval",
-  "config.redstone_utils.sculk_interval.description": "Geometry rebuild interval from 1 to 100 ticks.",
-  "config.redstone_utils.sculk_interval.tooltip": "Higher values reduce work for mostly static builds.",
+  "config.redstone_utils.sculk_interval.description": "Minimum delay between rebuilds of the same invalidated mesh, from 5 to 100 ticks.",
+  "config.redstone_utils.sculk_interval.tooltip": "Sensor and chunk discovery is event-driven; higher values only debounce repeated geometry changes.",
 
   "enum.redstone_utils.top_left": "Top Left",
   "enum.redstone_utils.top_right": "Top Right",

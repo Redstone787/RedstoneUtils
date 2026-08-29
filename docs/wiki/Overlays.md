@@ -18,7 +18,11 @@ The overlay is diagnostic only. It does not place updates, repair BUDs, suppress
 
 ## Sculk overlay
 
-Shows nearby sculk sensor analysis. Rendering is capped at the four nearest sensors by default and uses a configurable rebuild interval to reduce repeated scans.
+Shows nearby sculk sensor analysis. Rendering is capped at the four nearest sensors by default.
+
+The client maintains an event-driven index of sculk sensor block entities in loaded chunks. A chunk is inspected when it arrives, then normal block-entity load and unload events keep the index synchronized when sensors are placed, removed, replaced, or changed by another player. Multiplayer detection uses the vanilla chunk and block updates that the server already sends; the Redstone Utils server backend is not required for this overlay.
+
+Calculated range meshes are cached. A mesh is invalidated only when its sensor changes, a relevant chunk loads or unloads, or a block inside the sensor range changes whether it occludes vibration signals. At most one invalidated sensor mesh is rebuilt per client tick, and the configured Sculk update interval is the minimum delay before the same cached mesh may be rebuilt again. Cached render primitives are reused between frames.
 
 ## Appearance and snapshots
 

@@ -279,7 +279,11 @@ public final class ConfigScreen extends Screen {
         result.add(choice(Category.ACCESSIBILITY, "config.redstone_utils.popup_anchor", RedstoneUtilsConfig.PopupAnchor.values(), RedstoneUtilsConfig::getPopupAnchor, RedstoneUtilsConfig::setPopupAnchor, RedstoneUtilsConfig.PopupAnchor.TOP_LEFT));
         result.add(number(Category.ACCESSIBILITY, "config.redstone_utils.popup_duration", 1000, 15000, 0, () -> (double) RedstoneUtilsConfig.getPopupDurationMillis(), value -> RedstoneUtilsConfig.setPopupDurationMillis(value.intValue()), 3000));
 
-        result.add(number(Category.PERFORMANCE, "config.redstone_utils.overlay_distance", 8, 256, 0, () -> (double) RedstoneUtilsConfig.getOverlayMaxDistance(), value -> RedstoneUtilsConfig.setOverlayMaxDistance(value.intValue()), 128));
+        result.add(number(Category.PERFORMANCE, "config.redstone_utils.overlay_distance", 8, 256, 0, () -> (double) RedstoneUtilsConfig.getOverlayMaxDistance(), value -> {
+            RedstoneUtilsConfig.setOverlayMaxDistance(value.intValue());
+            BudSwitchOverlay.clear();
+            SculkSensorOverlay.requestRefresh();
+        }, 128));
         result.add(number(Category.PERFORMANCE, "config.redstone_utils.sculk_interval", 5, 100, 0, () -> (double) RedstoneUtilsConfig.getSculkRebuildIntervalTicks(), value -> { RedstoneUtilsConfig.setSculkRebuildIntervalTicks(value.intValue()); SculkSensorOverlay.requestRefresh(); }, 20));
         return result;
     }

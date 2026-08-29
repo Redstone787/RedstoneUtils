@@ -10,7 +10,7 @@ config/redstone_utils_macros.json
 config/redstone_utils_macros_export.json
 ```
 
-Available settings cover AutoWire and overlay visibility, BUD/sculk ranges, status HUD placement, feedback target, teleport fallback range, overlay colors/opacity/line width/distance, through-wall rendering, color-vision palettes, popup position/duration, and analysis rebuild intervals.
+Available settings cover AutoWire and overlay visibility, BUD/sculk ranges, status HUD placement, feedback target, teleport fallback range, overlay colors/opacity/line width/distance, through-wall rendering, color-vision palettes, popup position/duration, and analysis rebuild intervals. The Sculk update interval limits how soon the same invalidated cached mesh may be rebuilt; it no longer schedules periodic chunk scans.
 
 ## Safe writes and recovery
 

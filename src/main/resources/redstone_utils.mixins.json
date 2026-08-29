@@ -6,6 +6,9 @@
     "BucketItemMixin",
     "FlowingFluidMixin"
   ],
+  "client": [
+    "client.ClientLevelMixin"
+  ],
   "injectors": {
     "defaultRequire": 1
   }
